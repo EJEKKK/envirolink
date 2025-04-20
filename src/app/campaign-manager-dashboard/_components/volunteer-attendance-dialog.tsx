@@ -1,0 +1,173 @@
+"use client";
+import Image from "next/image";
+import * as React from "react";
+
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { db } from "@/config/firebase";
+import { getFrame } from "@/helper";
+import { participationConverter } from "@/lib/utils";
+import type { Participation } from "@/types";
+
+import type { CheckedState } from "@radix-ui/react-checkbox";
+import { format } from "date-fns";
+import { doc, updateDoc } from "firebase/firestore";
+import { CheckCircleIcon, Loader2, User2Icon } from "lucide-react";
+
+interface VolunteerAttendanceDialogProps {
+  participations: Participation[];
+}
+
+export default function VolunteerAttendanceDialog({
+  participations,
+}: VolunteerAttendanceDialogProps) {
+  const [selectedVolunteers, setSelectedVolunteers] = React.useState<
+    Participation[]
+  >([]);
+  const [isPending, setIsPending] = React.useState(false);
+  const [open, setOpen] = React.useState(false);
+
+  function handleOnValueChange(
+    checked: CheckedState,
+    participation: Participation,
+  ) {
+    if (checked) {
+      setSelectedVolunteers([...selectedVolunteers, participation]);
+    } else {
+      setSelectedVolunteers(
+        selectedVolunteers.filter((sVol) => sVol.id !== participation.id),
+      );
+    }
+  }
+
+  const handleOnMarkAsDone = async () => {
+    setIsPending(true);
+    const campaignRef = doc(
+      db,
+      "campaigns",
+      participations[0]?.campaignid ?? "",
+    );
+
+    if (selectedVolunteers.length >= 1) {
+      for (const volunteer of selectedVolunteers) {
+        const participationRef = doc(
+          db,
+          "participation",
+          volunteer.id,
+        ).withConverter(participationConverter);
+        await updateDoc(participationRef, {
+          isPresent: true,
+        });
+      }
+
+      await updateDoc(campaignRef, {
+        isDone: true,
+      });
+
+      setIsPending(true);
+      setOpen(false);
+      return;
+    }
+
+    await updateDoc(campaignRef, {
+      isDone: true,
+    });
+    setIsPending(true);
+    setOpen(false);
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button variant="outline">
+          <CheckCircleIcon /> Mark as Done
+        </Button>
+      </DialogTrigger>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Attendance of Joined Volunteers</DialogTitle>
+          <DialogDescription>
+            Manage the attendance of joined volunteers
+          </DialogDescription>
+        </DialogHeader>
+        <ScrollArea className="h-full max-h-80">
+          {participations.length >= 1 ? (
+            participations.map((participation) => (
+              <div key={participation.id} className="flex items-center gap-2">
+                <Checkbox
+                  id={participation.id}
+                  checked={selectedVolunteers.some(
+                    (sVol) => sVol.id === participation.id,
+                  )}
+                  onCheckedChange={(checked) =>
+                    handleOnValueChange(checked, participation)
+                  }
+                />
+                <Avatar>
+                  <AvatarImage
+                    src={participation.profilepictureURL}
+                    alt="profile_picture"
+                  />
+                  <AvatarFallback>
+                    <User2Icon />
+                  </AvatarFallback>
+                </Avatar>
+                <div className="text-xs">
+                  <Label
+                    className="flex items-center gap-1"
+                    htmlFor={participation.id}
+                  >
+                    <p>{participation.displayName}</p>
+                    <Image
+                      className="inline-block size-4"
+                      src={getFrame(participation.frameTier)}
+                      alt="frame"
+                      priority
+                      height={20}
+                      width={20}
+                    />
+                  </Label>
+
+                  <p className="text-muted-foreground">
+                    {format(
+                      participation.joindate.toDate(),
+                      "'Joined at' MMM dd, yyyy",
+                    )}
+                  </p>
+                </div>
+              </div>
+            ))
+          ) : (
+            <div className="flex justify-center">
+              <p className="text-muted-foreground">
+                No joined volunteers to show
+              </p>
+            </div>
+          )}
+        </ScrollArea>
+        <DialogFooter>
+          <DialogClose asChild>
+            <Button variant="ghost">Close</Button>
+          </DialogClose>
+          <Button onClick={handleOnMarkAsDone} disabled={isPending}>
+            {isPending && <Loader2 className="size-4 animate-spin" />} Mark as
+            done
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
