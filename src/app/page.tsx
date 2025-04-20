@@ -45,13 +45,7 @@ import {
 import type { Campaign, Comment } from "@/types";
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import {
-  differenceInDays,
-  format,
-  intlFormatDistance,
-  sub,
-  toDate,
-} from "date-fns";
+import { format, intlFormatDistance, sub } from "date-fns";
 import { type User, onAuthStateChanged, signOut } from "firebase/auth";
 import {
   collection,
@@ -188,7 +182,7 @@ export default function HomePage() {
           router.push("/campaign-manager-dashboard");
           break;
         default:
-          router.push("/user");
+          router.push("/user-role");
       }
     } catch {
       toast.error("Error", {
@@ -225,7 +219,7 @@ export default function HomePage() {
             router.push("/campaign-manager-dashboard");
             break;
           default:
-            router.push("/user");
+            router.push("/user-role");
         }
       } catch (error) {
         console.error("Error fetching user document:", error);
