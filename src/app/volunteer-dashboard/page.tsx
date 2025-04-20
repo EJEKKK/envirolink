@@ -145,8 +145,6 @@ export default function VounteerDashboard() {
   React.useEffect(() => {
     if (!user) return;
 
-    setIsFetching(true);
-
     const getLikes = async (docId: string) => {
       const likeRef = collection(db, "campaigns", docId, "likes").withConverter(
         likeConverter,
@@ -233,10 +231,8 @@ export default function VounteerDashboard() {
         );
 
         setCampaigns(filteredByWhenCampaigns);
-        setIsFetching(false);
       } else {
         setCampaigns(newCampaigns);
-        setIsFetching(false);
       }
     });
 
@@ -358,66 +354,58 @@ export default function VounteerDashboard() {
             <TabsTrigger value="all">All</TabsTrigger>
             <TabsTrigger value="joined-campaigns">Joined Campaigns</TabsTrigger>
           </TabsList>
-          {isFetching ? (
-            <div className="flex w-full items-center justify-center">
-              <Loader2Icon className="text-primary animate-spin" />
-            </div>
-          ) : (
-            <>
-              <TabsContent
-                className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3"
-                value="all"
-              >
-                {campaigns.length >= 1 ? (
-                  campaigns.map((campaign) => (
-                    <CampaignList
-                      key={campaign.id}
-                      campaign={campaign}
-                      participations={participations}
-                      user={user}
-                    />
-                  ))
-                ) : (
-                  <div className="text-muted-foreground flex items-center justify-center md:col-span-2 lg:col-span-3">
-                    No campaigns to show
-                  </div>
-                )}
-              </TabsContent>
-              <TabsContent
-                className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3"
-                value="joined-campaigns"
-              >
-                {campaigns.filter((campaign) =>
+          <TabsContent
+            className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3"
+            value="all"
+          >
+            {campaigns.length >= 1 ? (
+              campaigns.map((campaign) => (
+                <CampaignList
+                  key={campaign.id}
+                  campaign={campaign}
+                  participations={participations}
+                  user={user}
+                />
+              ))
+            ) : (
+              <div className="text-muted-foreground flex items-center justify-center md:col-span-2 lg:col-span-3">
+                No campaigns to show
+              </div>
+            )}
+          </TabsContent>
+          <TabsContent
+            className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3"
+            value="joined-campaigns"
+          >
+            {campaigns.filter((campaign) =>
+              participations.some(
+                (participation) =>
+                  participation.campaignid === campaign.id &&
+                  participation.uid === user.uid,
+              ),
+            ).length >= 1 ? (
+              campaigns
+                .filter((campaign) =>
                   participations.some(
                     (participation) =>
                       participation.campaignid === campaign.id &&
                       participation.uid === user.uid,
                   ),
-                ).length >= 1 ? (
-                  campaigns
-                    .filter((campaign) =>
-                      participations.some(
-                        (participation) =>
-                          participation.campaignid === campaign.id &&
-                          participation.uid === user.uid,
-                      ),
-                    )
-                    .map((campaign) => (
-                      <CampaignList
-                        key={campaign.id}
-                        campaign={campaign}
-                        participations={participations}
-                        user={user}
-                      />
-                    ))
-                ) : (
-                  <div className="text-muted-foreground flex items-center justify-center md:col-span-2 lg:col-span-3">
-                    You don't have any joined campaigns yet
-                  </div>
-                )}
-              </TabsContent>
-            </>
-          )}
+                )
+                .map((campaign) => (
+                  <CampaignList
+                    key={campaign.id}
+                    campaign={campaign}
+                    participations={participations}
+                    user={user}
+                  />
+                ))
+            ) : (
+              <div className="text-muted-foreground flex items-center justify-center md:col-span-2 lg:col-span-3">
+                You don't have any joined campaigns yet
+              </div>
+            )}
+          </TabsContent>
         </Tabs>
       </section>
     </main>
@@ -683,12 +671,24 @@ function CampaignList({ campaign, participations, user }: CampaignListProps) {
   // Helper function to update frame tier
   async function updateFrameTier(userRef: DocumentReference) {
     const userSnap = await getDoc(userRef);
+    const [silver, gold, platinum, diamond]: Awaited<number[]> =
+      (await Promise.all([
+        (await getDoc(doc(db, "rankDescription", "silver")))?.data()
+          ?.points as Awaited<number>,
+        (await getDoc(doc(db, "rankDescription", "gold")))?.data()
+          ?.points as Awaited<number>,
+        (await getDoc(doc(db, "rankDescription", "platinum")))?.data()
+          ?.points as Awaited<number>,
+        (await getDoc(doc(db, "rankDescription", "diamond")))?.data()
+          ?.points as Awaited<number>,
+      ])) as number[];
+
     if (userSnap.exists()) {
       const points = userSnap.data().points || 0;
       const currentTier = userSnap.data().frameTier as FrameTier;
 
       let tier: FrameTier;
-      if (points >= 5001) {
+      if (points >= (diamond as number)) {
         tier = "diamond";
 
         if (currentTier !== "diamond") {
@@ -697,21 +697,21 @@ function CampaignList({ campaign, participations, user }: CampaignListProps) {
             : setFrameTier("platinum");
           setIsRankDialogOpen(true);
         }
-      } else if (points >= 3501) {
+      } else if (points >= (platinum as number)) {
         tier = "platinum";
 
         if (currentTier !== "platinum") {
           type === "promote" ? setFrameTier("platinum") : setFrameTier("gold");
           setIsRankDialogOpen(true);
         }
-      } else if (points >= 1501) {
+      } else if (points >= (gold as number)) {
         tier = "gold";
 
         if (currentTier !== "gold") {
           type === "promote" ? setFrameTier("gold") : setFrameTier("silver");
           setIsRankDialogOpen(true);
         }
-      } else if (points >= 501) {
+      } else if (points >= (silver as number)) {
         tier = "silver";
 
         if (currentTier !== "silver") {
@@ -729,11 +729,6 @@ function CampaignList({ campaign, participations, user }: CampaignListProps) {
       await updateDoc(userRef, { frameTier: tier });
     }
   }
-
-  const handleOnMarkAsDone = async (campaignId: string) => {
-    const campaignRef = doc(db, "campaigns", campaignId);
-    await updateDoc(campaignRef, { isDone: true });
-  };
 
   // Function to get the count of likes for a campaign
   function getLikesCount() {
@@ -1217,12 +1212,24 @@ function CommentsDialog({
   // Helper function to update frame tier
   async function updateFrameTier(userRef: DocumentReference) {
     const userSnap = await getDoc(userRef);
+    const [silver, gold, platinum, diamond]: Awaited<number[]> =
+      (await Promise.all([
+        (await getDoc(doc(db, "rankDescription", "silver")))?.data()
+          ?.points as Awaited<number>,
+        (await getDoc(doc(db, "rankDescription", "gold")))?.data()
+          ?.points as Awaited<number>,
+        (await getDoc(doc(db, "rankDescription", "platinum")))?.data()
+          ?.points as Awaited<number>,
+        (await getDoc(doc(db, "rankDescription", "diamond")))?.data()
+          ?.points as Awaited<number>,
+      ])) as number[];
+
     if (userSnap.exists()) {
       const points = userSnap.data().points || 0;
       const currentTier = userSnap.data().frameTier as FrameTier;
 
       let tier: FrameTier;
-      if (points >= 5001) {
+      if (points >= (diamond as number)) {
         tier = "diamond";
 
         if (currentTier !== "diamond") {
@@ -1231,21 +1238,21 @@ function CommentsDialog({
             : setFrameTier("platinum");
           setIsRankDialogOpen(true);
         }
-      } else if (points >= 3501) {
+      } else if (points >= (platinum as number)) {
         tier = "platinum";
 
         if (currentTier !== "platinum") {
           type === "promote" ? setFrameTier("platinum") : setFrameTier("gold");
           setIsRankDialogOpen(true);
         }
-      } else if (points >= 1501) {
+      } else if (points >= (gold as number)) {
         tier = "gold";
 
         if (currentTier !== "gold") {
           type === "promote" ? setFrameTier("gold") : setFrameTier("silver");
           setIsRankDialogOpen(true);
         }
-      } else if (points >= 501) {
+      } else if (points >= (silver as number)) {
         tier = "silver";
 
         if (currentTier !== "silver") {
@@ -1255,7 +1262,7 @@ function CommentsDialog({
       } else {
         tier = "bronze";
 
-        if (currentTier !== "bronze" && type === "demote") {
+        if (currentTier !== "bronze") {
           setFrameTier("bronze");
           setIsRankDialogOpen(true);
         }

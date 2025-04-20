@@ -1,20 +1,7 @@
 import Link from "next/link";
 import * as React from "react";
 
-import { onAuthStateChanged, signOut } from "firebase/auth";
-import { doc, getDoc } from "firebase/firestore";
-import { ChevronsUpDown, LogOut, UserIcon } from "lucide-react";
-
 import TopLoader from "@/components/next-top-loader";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import {
   Sidebar,
   SidebarContent,
@@ -29,10 +16,6 @@ import {
   SidebarMenuItem,
   SidebarProvider,
 } from "@/components/ui/sidebar";
-import { auth, db } from "@/config/firebase";
-import { useIsMobile } from "@/hooks/use-mobile";
-import { userConverter } from "@/lib/utils";
-import type { User } from "@/types";
 import SidebarNavUser from "./_components/sidebar-nav-user";
 
 export default function AdminLayout({
@@ -52,6 +35,7 @@ export default function AdminLayout({
         <SidebarContent>
           <UserSidebarGroup />
           <CampaignSidebarGroup />
+          <RankDescriptionSidebarGroup />
         </SidebarContent>
         <SidebarFooter>
           <SidebarNavUser />
@@ -105,6 +89,23 @@ function CampaignSidebarGroup() {
           <SidebarMenuItem>
             <SidebarMenuButton asChild>
               <Link href="/admin/pending-campaigns">Pending campaigns</Link>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        </SidebarMenu>
+      </SidebarGroupContent>
+    </SidebarGroup>
+  );
+}
+
+function RankDescriptionSidebarGroup() {
+  return (
+    <SidebarGroup>
+      <SidebarGroupLabel>Rank Badge Description</SidebarGroupLabel>
+      <SidebarGroupContent>
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <SidebarMenuButton asChild>
+              <Link href="/admin/rank-description">Rank description</Link>
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
