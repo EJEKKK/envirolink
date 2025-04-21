@@ -25,7 +25,6 @@ import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
 import {
   CloudUploadIcon,
   Loader,
-  Loader2Icon,
   MessageCircleIcon,
   SendIcon,
   Share2Icon,
@@ -101,6 +100,12 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { auth, db, storage } from "@/config/firebase";
 import { addScoreLog, getFrame } from "@/helper";
 import useCreateCampaignStore from "@/hooks/use-create-campaign-store";
@@ -125,6 +130,7 @@ import type {
 } from "@/types";
 import VolunteerAttendanceDialog from "./_components/volunteer-attendance-dialog";
 
+import Image from "next/image";
 import type { DateRange } from "react-day-picker";
 import { useShallow } from "zustand/shallow";
 
@@ -275,7 +281,6 @@ export default function CampaignManagerDashboard() {
 
     const participationQuery = query(
       collection(db, "participation").withConverter(participationConverter),
-      where("uid", "==", user?.uid),
       where("status", "==", "joined"),
     );
 
@@ -1127,249 +1132,347 @@ function CampaignList({ campaign, participations, user }: CampaignListProps) {
   }, [campaign.id]);
 
   return (
-    <div className="flex w-full max-w-2xl flex-col gap-4">
-      <Card className="w-full">
-        <CardHeader>
-          <CardTitle className="flex items-center justify-between font-bold">
-            <div className="flex items-center gap-2">
-              <Link href={`/profile/${campaign.managerUid}`}>
-                <Avatar>
-                  <AvatarImage src={campaign.managerPhotoURL} />
-                  <AvatarFallback>
-                    {campaign.managerDisplayName.slice(0, 2)}
-                  </AvatarFallback>
-                </Avatar>
-              </Link>
-              <div>
-                <p className="text-sm font-semibold">
-                  {campaign.managerDisplayName ?? "Anonymous"}
-                </p>
-                <p className="text-sm">{campaign.title}</p>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <Badge
-                className={cn("cursor-pointer")}
-                variant={campaign.isDone ? "outline" : "default"}
-              >
-                {campaign.isDone
-                  ? "Done"
-                  : campaign.description.when.toDate() <= new Date()
-                    ? "Ongoing"
-                    : "New"}
-              </Badge>
-              {campaign.isDone || user?.uid !== campaign.managerUid ? null : (
-                <VolunteerAttendanceDialog
-                  participations={participations.filter(
-                    (participation) => participation.campaignid === campaign.id,
-                  )}
-                  campaign={campaign}
-                />
-              )}
-            </div>
-          </CardTitle>
-          <Separator className="my-2" />
-          <CardDescription className="grid gap-4 sm:grid-cols-2">
-            <div>
-              <p>What:</p>
-              <p className="text-primary font-semibold">
-                {campaign.description.what}
-              </p>
-            </div>
-
-            <div>
-              <p>When:</p>
-              <p className="text-primary font-semibold">
-                {format(
-                  campaign.description.when.toDate(),
-                  "MMM dd, yyyy 'at' hh:mm aaaa",
-                )}
-              </p>
-            </div>
-
-            <div>
-              <p>Where:</p>
-              <p className="text-primary font-semibold">
-                {campaign.description.where}
-              </p>
-            </div>
-          </CardDescription>
-          <Separator />
-          <div className="grid gap-4 text-sm md:grid-cols-2">
-            <div>
-              <p>Like</p>
-              <p className="text-primary font-semibold">
-                {campaign.points?.like} pts
-              </p>
-            </div>
-
-            <div>
-              <p>Comment</p>
-              <p className="text-primary font-semibold">
-                {campaign.points?.comment} pts
-              </p>
-            </div>
-
-            <div>
-              <p>Join</p>
-              <p className="text-primary font-semibold">
-                {campaign.points?.join} pts
-              </p>
-            </div>
-
-            <div>
-              <p>Share</p>
-              <p className="text-primary font-semibold">
-                {campaign.points?.share} pts
-              </p>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent>
-          {campaign.photoURLs.length >= 1 ? (
-            <div className="grid h-96 grid-cols-2 gap-2 overflow-hidden rounded-md">
-              {campaign.photoURLs.slice(0, 2).map((photo, index) => (
-                <div
-                  className={cn(
-                    "bg-accent relative col-span-2 flex h-full cursor-pointer items-center justify-center overflow-hidden",
-                    campaign.photoURLs.length > 2 &&
-                      index === 1 &&
-                      "col-start-1 col-end-2",
-                  )}
-                  key={index}
-                  onClick={() => handleOnImageClick(index)}
-                >
-                  <AspectRatio ratio={16 / 9}>
-                    <img
-                      className="size-full object-cover object-center"
-                      src={photo}
-                      alt="campaign image"
-                    />
-                  </AspectRatio>
-                </div>
-              ))}
-
-              {campaign.photoURLs.length >= 3 ? (
-                <div
-                  className="bg-accent relative col-start-2 col-end-3 flex h-full cursor-pointer items-center justify-center overflow-hidden"
-                  onClick={() => handleOnImageClick(0)}
-                >
-                  <p className="text-primary text-4xl font-bold">
-                    {campaign.photoURLs.length - 2}+
-                  </p>
-                </div>
-              ) : null}
-            </div>
-          ) : null}
-
-          <CampaignLightBoxDialog
-            open={isLightBoxOpen}
-            onOpenChange={setIsLightBoxOpen}
-            photoURLs={campaign.photoURLs}
-            activeIndex={current}
-          />
-
-          <CommentsDialog
-            campaignId={campaign.id}
-            user={user}
-            open={isCommentDialogOpen}
-            onOpenChange={setIsCommentDialogOpen}
-          />
-
-          <RankBadgeDialog
-            open={isRankDialogOpen}
-            onOpenChange={setIsRankDialogOpen}
-            frameTier={frameTier}
-            type={type}
-          />
-
-          <div className="flex items-center justify-between">
-            <p className="text-muted-foreground my-4 text-sm">
-              Likes: {formatCompactNumber(getLikesCount())}
-            </p>
-            <p className="text-muted-foreground my-4 text-sm">
-              Comments: {formatCompactNumber(comments.length)}
-            </p>
-            <p className="text-muted-foreground my-4 text-sm">
-              Shares: {formatCompactNumber(shareCount)}
-            </p>
-          </div>
-          <Separator />
-        </CardContent>
-        <CardFooter className="flex-col gap-2 sm:flex-row">
-          <Button
-            className={cn("w-full grow cursor-pointer sm:w-auto", {
-              "text-primary hover:text-primary": campaign.likes?.some(
-                (like) => like.uid === user?.uid && like.type === "like", // Check if the user has liked the campaign
-              ),
-            })}
-            variant="ghost"
-            onClick={() => void handleOnLikeCampaign(campaign.id)}
-            disabled={isLoading}
-          >
-            <ThumbsUpIcon /> Like
-          </Button>
-          <Button
-            className="w-full grow cursor-pointer sm:w-auto"
-            variant="ghost"
-            onClick={() => setIsCommentDialogOpen(true)}
-          >
-            <MessageCircleIcon /> Comment
-          </Button>
-
-          <Button
-            className="w-full grow cursor-pointer sm:w-auto"
-            variant="ghost"
-            onClick={() => void handleOnShareCampaign(campaign.id)}
-          >
-            <Share2Icon /> Share
-          </Button>
-        </CardFooter>
-      </Card>
-      {comments.length >= 1
-        ? comments.slice(0, 3).map((comment) => (
-            <Card key={comment.id} className="w-full p-0">
-              <CardContent className="p-2">
+    <TooltipProvider disableHoverableContent delayDuration={500}>
+      <div className="flex w-full max-w-2xl flex-col gap-4">
+        <Card className="w-full">
+          <CardHeader>
+            <CardTitle className="flex items-center justify-between font-bold">
+              <div className="flex items-center gap-2">
+                <Link href={`/profile/${campaign.managerUid}`}>
+                  <Avatar>
+                    <AvatarImage src={campaign.managerPhotoURL} />
+                    <AvatarFallback>
+                      {campaign.managerDisplayName.slice(0, 2)}
+                    </AvatarFallback>
+                  </Avatar>
+                </Link>
                 <div>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <Link href={`/profile/${comment.uid}`}>
-                        <Avatar>
-                          <AvatarImage src={comment.userPhotoURL ?? ""} />
+                  <p className="text-sm font-semibold">
+                    {campaign.managerDisplayName ?? "Anonymous"}
+                  </p>
+                  <p className="text-sm">{campaign.title}</p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <Badge
+                  className={cn("cursor-pointer")}
+                  variant={campaign.isDone ? "outline" : "default"}
+                >
+                  {campaign.isDone
+                    ? "Done"
+                    : campaign.description.when.toDate() <= new Date()
+                      ? "Ongoing"
+                      : "New"}
+                </Badge>
+                {campaign.isDone || user?.uid !== campaign.managerUid ? null : (
+                  <VolunteerAttendanceDialog
+                    participations={participations.filter(
+                      (participation) =>
+                        participation.campaignid === campaign.id,
+                    )}
+                    campaign={campaign}
+                  />
+                )}
+              </div>
+            </CardTitle>
+            <Separator className="my-2" />
+            <CardDescription className="grid gap-4 sm:grid-cols-2">
+              <div>
+                <p>What:</p>
+                <p className="text-primary font-semibold">
+                  {campaign.description.what}
+                </p>
+              </div>
+
+              <div>
+                <p>When:</p>
+                <p className="text-primary font-semibold">
+                  {format(
+                    campaign.description.when.toDate(),
+                    "MMM dd, yyyy 'at' hh:mm aaaa",
+                  )}
+                </p>
+              </div>
+
+              <div>
+                <p>Where:</p>
+                <p className="text-primary font-semibold">
+                  {campaign.description.where}
+                </p>
+              </div>
+
+              <div className="flex items-center">
+                {participations
+                  .slice(0, 3)
+                  .filter(
+                    (participation) => participation.campaignid === campaign.id,
+                  )
+                  .map((participation, index) => (
+                    <Tooltip key={participation.id}>
+                      <TooltipTrigger asChild>
+                        <Avatar
+                          className={cn("border-2", index >= 1 && "-ml-4")}
+                        >
+                          <AvatarImage
+                            src={participation.profilepictureURL}
+                            alt={participation.displayName}
+                          />
                           <AvatarFallback>
-                            {comment.displayName.slice(0, 2)}
+                            {participation.displayName.charAt(0).toUpperCase()}
                           </AvatarFallback>
                         </Avatar>
-                      </Link>
-                      <div className="flex items-center gap-1">
-                        <p className="text-xs font-bold">
-                          {comment.displayName}
-                        </p>
-                        <img
-                          className="size-4"
-                          src={getFrame(comment.frameTier)}
-                          alt={comment.displayName}
+                      </TooltipTrigger>
+                      <TooltipContent className="flex items-center gap-2">
+                        <Avatar className="border-2">
+                          <AvatarImage
+                            src={participation.profilepictureURL}
+                            alt={participation.displayName}
+                          />
+                          <AvatarFallback>
+                            {participation.displayName.charAt(0).toUpperCase()}
+                          </AvatarFallback>
+                        </Avatar>
+                        {participation.displayName}
+                        <Image
+                          src={getFrame(participation.frameTier)}
+                          alt={participation.displayName}
+                          priority
+                          height={20}
+                          width={20}
                         />
-                      </div>
-                    </div>
-                    <p className="text-primary text-xs font-semibold">
-                      {intlFormatDistance(
-                        comment.timestamp?.toDate() ?? new Date(),
-                        new Date(),
-                        { style: "narrow" },
-                      )}
+                      </TooltipContent>
+                    </Tooltip>
+                  ))}
+                {participations.filter(
+                  (campaign) => campaign.campaignid === campaign.id,
+                ).length > 3 ? (
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Avatar className="-ml-4">
+                        <AvatarFallback>
+                          {participations.filter(
+                            (campaign) => campaign.campaignid === campaign.id,
+                          ).length - 3}
+                          +
+                        </AvatarFallback>
+                      </Avatar>
+                    </TooltipTrigger>
+                    <TooltipContent className="flex flex-col items-center gap-2">
+                      <ScrollArea className="h-full max-h-80">
+                        {participations
+                          .slice(2)
+                          .filter(
+                            (campaign) => campaign.campaignid === campaign.id,
+                          )
+                          .map((participation) => (
+                            <div
+                              key={participation.id}
+                              className="flex items-center gap-2"
+                            >
+                              <Avatar className="border-2">
+                                <AvatarImage
+                                  src={participation.profilepictureURL}
+                                  alt={participation.displayName}
+                                />
+                                <AvatarFallback>
+                                  {participation.displayName
+                                    .charAt(0)
+                                    .toUpperCase()}
+                                </AvatarFallback>
+                              </Avatar>
+                              {participation.displayName}
+                              <Image
+                                src={getFrame(participation.frameTier)}
+                                alt={participation.displayName}
+                                priority
+                                height={20}
+                                width={20}
+                              />
+                            </div>
+                          ))}
+                      </ScrollArea>
+                    </TooltipContent>
+                  </Tooltip>
+                ) : null}
+              </div>
+            </CardDescription>
+            <Separator />
+            <div className="grid gap-4 text-sm md:grid-cols-2">
+              <div>
+                <p>Like</p>
+                <p className="text-primary font-semibold">
+                  {campaign.points?.like} pts
+                </p>
+              </div>
+
+              <div>
+                <p>Comment</p>
+                <p className="text-primary font-semibold">
+                  {campaign.points?.comment} pts
+                </p>
+              </div>
+
+              <div>
+                <p>Join</p>
+                <p className="text-primary font-semibold">
+                  {campaign.points?.join} pts
+                </p>
+              </div>
+
+              <div>
+                <p>Share</p>
+                <p className="text-primary font-semibold">
+                  {campaign.points?.share} pts
+                </p>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {campaign.photoURLs.length >= 1 ? (
+              <div className="grid h-96 grid-cols-2 gap-2 overflow-hidden rounded-md">
+                {campaign.photoURLs.slice(0, 2).map((photo, index) => (
+                  <div
+                    className={cn(
+                      "bg-accent relative col-span-2 flex h-full cursor-pointer items-center justify-center overflow-hidden",
+                      campaign.photoURLs.length > 2 &&
+                        index === 1 &&
+                        "col-start-1 col-end-2",
+                    )}
+                    key={index}
+                    onClick={() => handleOnImageClick(index)}
+                  >
+                    <AspectRatio ratio={16 / 9}>
+                      <img
+                        className="size-full object-cover object-center"
+                        src={photo}
+                        alt="campaign image"
+                      />
+                    </AspectRatio>
+                  </div>
+                ))}
+
+                {campaign.photoURLs.length >= 3 ? (
+                  <div
+                    className="bg-accent relative col-start-2 col-end-3 flex h-full cursor-pointer items-center justify-center overflow-hidden"
+                    onClick={() => handleOnImageClick(0)}
+                  >
+                    <p className="text-primary text-4xl font-bold">
+                      {campaign.photoURLs.length - 2}+
                     </p>
                   </div>
-                  <p className="text-muted-foreground text-xs">
-                    {comment.comment}
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
-          ))
-        : null}
-    </div>
+                ) : null}
+              </div>
+            ) : null}
+
+            <CampaignLightBoxDialog
+              open={isLightBoxOpen}
+              onOpenChange={setIsLightBoxOpen}
+              photoURLs={campaign.photoURLs}
+              activeIndex={current}
+            />
+
+            <CommentsDialog
+              campaignId={campaign.id}
+              user={user}
+              open={isCommentDialogOpen}
+              onOpenChange={setIsCommentDialogOpen}
+            />
+
+            <RankBadgeDialog
+              open={isRankDialogOpen}
+              onOpenChange={setIsRankDialogOpen}
+              frameTier={frameTier}
+              type={type}
+            />
+
+            <div className="flex items-center justify-between">
+              <p className="text-muted-foreground my-4 text-sm">
+                Likes: {formatCompactNumber(getLikesCount())}
+              </p>
+              <p className="text-muted-foreground my-4 text-sm">
+                Comments: {formatCompactNumber(comments.length)}
+              </p>
+              <p className="text-muted-foreground my-4 text-sm">
+                Shares: {formatCompactNumber(shareCount)}
+              </p>
+            </div>
+            <Separator />
+          </CardContent>
+          <CardFooter className="flex-col gap-2 sm:flex-row">
+            <Button
+              className={cn("w-full grow cursor-pointer sm:w-auto", {
+                "text-primary hover:text-primary": campaign.likes?.some(
+                  (like) => like.uid === user?.uid && like.type === "like", // Check if the user has liked the campaign
+                ),
+              })}
+              variant="ghost"
+              onClick={() => void handleOnLikeCampaign(campaign.id)}
+              disabled={isLoading}
+            >
+              <ThumbsUpIcon /> Like
+            </Button>
+            <Button
+              className="w-full grow cursor-pointer sm:w-auto"
+              variant="ghost"
+              onClick={() => setIsCommentDialogOpen(true)}
+            >
+              <MessageCircleIcon /> Comment
+            </Button>
+
+            <Button
+              className="w-full grow cursor-pointer sm:w-auto"
+              variant="ghost"
+              onClick={() => void handleOnShareCampaign(campaign.id)}
+            >
+              <Share2Icon /> Share
+            </Button>
+          </CardFooter>
+        </Card>
+        {comments.length >= 1
+          ? comments.slice(0, 3).map((comment) => (
+              <Card key={comment.id} className="w-full p-0">
+                <CardContent className="p-2">
+                  <div>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Link href={`/profile/${comment.uid}`}>
+                          <Avatar>
+                            <AvatarImage src={comment.userPhotoURL ?? ""} />
+                            <AvatarFallback>
+                              {comment.displayName.slice(0, 2)}
+                            </AvatarFallback>
+                          </Avatar>
+                        </Link>
+                        <div className="flex items-center gap-1">
+                          <p className="text-xs font-bold">
+                            {comment.displayName}
+                          </p>
+                          <img
+                            className="size-4"
+                            src={getFrame(comment.frameTier)}
+                            alt={comment.displayName}
+                          />
+                        </div>
+                      </div>
+                      <p className="text-primary text-xs font-semibold">
+                        {intlFormatDistance(
+                          comment.timestamp?.toDate() ?? new Date(),
+                          new Date(),
+                          { style: "narrow" },
+                        )}
+                      </p>
+                    </div>
+                    <p className="text-muted-foreground text-xs">
+                      {comment.comment}
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+            ))
+          : null}
+      </div>
+    </TooltipProvider>
   );
 }
 

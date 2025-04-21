@@ -14,7 +14,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { auth } from "@/config/firebase";
 import useCreateCampaignStore from "@/hooks/use-create-campaign-store";
-import { cn } from "@/lib/utils";
+import { cn, formatCompactNumber } from "@/lib/utils";
 import type { User } from "@/types";
 import { Avatar, AvatarFallback, AvatarImage } from "../ui/avatar";
 import { Button } from "../ui/button";
@@ -30,6 +30,7 @@ import {
   User2Icon,
 } from "lucide-react";
 import { useScoreLogStore } from "@/hooks/use-score-log-store";
+import { getFrame } from "@/helper";
 
 interface NavbarProps {
   user: User;
@@ -78,6 +79,13 @@ export default function Navbar({ user }: NavbarProps) {
                     <Skeleton className="size-full" />
                   </AvatarFallback>
                 </Avatar>
+                <Image
+                  src={getFrame(user.frameTier)}
+                  alt="frame tier"
+                  height={18}
+                  width={18}
+                />
+                <p className="text-xs">{formatCompactNumber(user.points)}pts</p>
                 <ChevronDown className="size-4" />
               </Button>
             </DropdownMenuTrigger>

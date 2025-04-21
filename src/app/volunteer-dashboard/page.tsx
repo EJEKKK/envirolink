@@ -1,4 +1,5 @@
 "use client";
+import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import * as React from "react";
@@ -68,6 +69,11 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { auth, db } from "@/config/firebase";
 import { addScoreLog, getFrame } from "@/helper";
 import {
@@ -110,7 +116,6 @@ export default function VounteerDashboard() {
     [],
   );
   const [date, setDate] = React.useState<DateRange | undefined>();
-  const [isFetching, setIsFetching] = React.useState(false);
 
   //Filter State
   const [categories, setCategories] = React.useState<string[]>([]);
@@ -177,7 +182,6 @@ export default function VounteerDashboard() {
       orderBy("createdAt", "desc"),
     );
     const unsubCampaign = onSnapshot(campaignQuery, async (snapshot) => {
-      setIsFetching(true);
       const newCampaigns: Campaign[] = [];
 
       for (const doc of snapshot.docs) {
@@ -857,6 +861,99 @@ function CampaignList({ campaign, participations, user }: CampaignListProps) {
               <p className="text-primary font-semibold">
                 {campaign.description.where}
               </p>
+            </div>
+
+            <div className="flex items-center">
+              {participations
+                .slice(0, 3)
+                .filter(
+                  (participation) => participation.campaignid === campaign.id,
+                )
+                .map((participation, index) => (
+                  <Tooltip key={participation.id}>
+                    <TooltipTrigger asChild>
+                      <Avatar className={cn("border-2", index >= 1 && "-ml-4")}>
+                        <AvatarImage
+                          src={participation.profilepictureURL}
+                          alt={participation.displayName}
+                        />
+                        <AvatarFallback>
+                          {participation.displayName.charAt(0).toUpperCase()}
+                        </AvatarFallback>
+                      </Avatar>
+                    </TooltipTrigger>
+                    <TooltipContent className="flex items-center gap-2">
+                      <Avatar className="border-2">
+                        <AvatarImage
+                          src={participation.profilepictureURL}
+                          alt={participation.displayName}
+                        />
+                        <AvatarFallback>
+                          {participation.displayName.charAt(0).toUpperCase()}
+                        </AvatarFallback>
+                      </Avatar>
+                      {participation.displayName}
+                      <Image
+                        src={getFrame(participation.frameTier)}
+                        alt={participation.displayName}
+                        priority
+                        height={20}
+                        width={20}
+                      />
+                    </TooltipContent>
+                  </Tooltip>
+                ))}
+              {participations.filter(
+                (campaign) => campaign.campaignid === campaign.id,
+              ).length > 3 ? (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Avatar className="-ml-4">
+                      <AvatarFallback>
+                        {participations.filter(
+                          (campaign) => campaign.campaignid === campaign.id,
+                        ).length - 3}
+                        +
+                      </AvatarFallback>
+                    </Avatar>
+                  </TooltipTrigger>
+                  <TooltipContent className="flex flex-col items-center gap-2">
+                    <ScrollArea className="h-full max-h-80">
+                      {participations
+                        .slice(2)
+                        .filter(
+                          (campaign) => campaign.campaignid === campaign.id,
+                        )
+                        .map((participation) => (
+                          <div
+                            key={participation.id}
+                            className="flex items-center gap-2"
+                          >
+                            <Avatar className="border-2">
+                              <AvatarImage
+                                src={participation.profilepictureURL}
+                                alt={participation.displayName}
+                              />
+                              <AvatarFallback>
+                                {participation.displayName
+                                  .charAt(0)
+                                  .toUpperCase()}
+                              </AvatarFallback>
+                            </Avatar>
+                            {participation.displayName}
+                            <Image
+                              src={getFrame(participation.frameTier)}
+                              alt={participation.displayName}
+                              priority
+                              height={20}
+                              width={20}
+                            />
+                          </div>
+                        ))}
+                    </ScrollArea>
+                  </TooltipContent>
+                </Tooltip>
+              ) : null}
             </div>
           </CardDescription>
           <Separator />
