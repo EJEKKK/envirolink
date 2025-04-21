@@ -401,14 +401,36 @@ interface FrameProps {
 }
 
 function Frame({ points }: FrameProps) {
+  const [rankPoints, setRankPoints] = React.useState<number[]>([]);
   function applyFrame() {
-    if (points >= 5001) return "DIAMOND.png";
-    if (points >= 3501) return "PLATINUM.png";
-    if (points >= 1501) return "GOLD.png";
-    if (points >= 501) return "SILVER.png";
+    if (points >= (rankPoints[3] as number)) return "DIAMOND.png";
+    if (points >= (rankPoints[2] as number)) return "PLATINUM.png";
+    if (points >= (rankPoints[1] as number)) return "GOLD.png";
+    if (points >= (rankPoints[0] as number)) return "SILVER.png";
 
     return "BRONZE.png";
   }
+
+  React.useEffect(() => {
+    async function fetchRankPoints() {
+      const rankPoints: Awaited<number[]> = (await Promise.all([
+        (await getDoc(doc(db, "rankDescription", "silver")))?.data()
+          ?.points as Awaited<number>,
+        (await getDoc(doc(db, "rankDescription", "gold")))?.data()
+          ?.points as Awaited<number>,
+        (await getDoc(doc(db, "rankDescription", "platinum")))?.data()
+          ?.points as Awaited<number>,
+        (await getDoc(doc(db, "rankDescription", "diamond")))?.data()
+          ?.points as Awaited<number>,
+      ])) as number[];
+
+      if (rankPoints.length > 0) {
+        setRankPoints(rankPoints);
+      }
+    }
+
+    void fetchRankPoints();
+  }, []);
 
   return (
     <div className="w-20">
@@ -558,11 +580,14 @@ function CampaignList({ campaign, participations, user }: CampaignListProps) {
           </div>
         </CardDescription>
       </CardHeader>
+
       <RankBadgeDialog
         open={isRankDialogOpen}
         onOpenChange={setIsRankDialogOpen}
         frameTier={frameTier}
+        type={type}
       />
+
       {participations.some(
         (participation) => participation.uid === auth.currentUser?.uid,
       ) && (
@@ -586,12 +611,14 @@ interface RankBadgeDialogProps {
   open: boolean;
   onOpenChange: React.Dispatch<React.SetStateAction<boolean>>;
   frameTier: FrameTier;
+  type: "promote" | "demote";
 }
 
 function RankBadgeDialog({
   open = true,
   onOpenChange,
   frameTier,
+  type,
 }: RankBadgeDialogProps) {
   function getFrame() {
     switch (frameTier) {
@@ -629,12 +656,16 @@ function RankBadgeDialog({
               />
             </AspectRatio>
           </div>
-          You have been promoted to the{" "}
+          {type === "promote"
+            ? "You have been promoted to the"
+            : "You have been demoted to the"}
           <span className="font-bold">
             {frameTier.charAt(0).toUpperCase() + frameTier.slice(1)}
           </span>{" "}
-          tier! Keep up the great work and continue participating to earn more
-          points and rewards.
+          tier!{" "}
+          {type === "promote"
+            ? "Keep up the great work and continue participating to earn more points and rewards."
+            : "You can try to earn back your previous rank by participating in more campaigns."}
         </div>
         <DialogFooter>
           <DialogClose asChild>

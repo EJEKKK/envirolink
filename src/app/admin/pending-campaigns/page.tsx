@@ -405,7 +405,6 @@ function AcceptCampaignDialog({
       await updateDoc(managerRef, {
         points: increment(Number(values.points.campaignManager)),
       });
-      await updateFrameTier(managerRef);
 
       toast.success("Campaign approved successfully.");
     } catch (error) {
@@ -413,23 +412,6 @@ function AcceptCampaignDialog({
       toast.error("Error approving campaign. Please try again.");
     }
   };
-
-  // Helper function to update frame tier
-  async function updateFrameTier(userRef: DocumentReference<User>) {
-    const userSnap = await getDoc(userRef);
-
-    if (userSnap.exists()) {
-      const points = userSnap.data().points || 0;
-      let tier: FrameTier;
-      if (points >= 5001) tier = "diamond";
-      else if (points >= 3501) tier = "platinum";
-      else if (points >= 1501) tier = "gold";
-      else if (points >= 501) tier = "silver";
-      else tier = "bronze";
-
-      await updateDoc(userRef, { frameTier: tier });
-    }
-  }
 
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
