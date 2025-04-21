@@ -314,12 +314,8 @@ export default function ProfileSection({ userId }: ProfileSectionProps) {
         </div>
 
         <CardFooter className="justify-center gap-4">
-          {currentUser?.uid === userId && (
-            <>
-              <EditProfileDialog user={user} />
-              <Button onClick={navigateToDashboard}>Back to Dashboard</Button>
-            </>
-          )}
+          {currentUser?.uid === userId && <EditProfileDialog user={user} />}
+          <Button onClick={navigateToDashboard}>Back to Dashboard</Button>
         </CardFooter>
       </Card>
 
