@@ -1164,6 +1164,7 @@ function CampaignList({ campaign, participations, user }: CampaignListProps) {
                   participations={participations.filter(
                     (participation) => participation.campaignid === campaign.id,
                   )}
+                  campaign={campaign}
                 />
               )}
             </div>

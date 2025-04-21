@@ -237,7 +237,7 @@ export default function CompletedCampaigns() {
             </div>
           ) : campaigns.length >= 1 ? (
             campaigns
-              .filter((campaign) => !campaign.isScoreApplied)
+              .filter((campaign) => !campaign.isScoreApplied && campaign.isDone)
               .map((campaign) => (
                 <CampaignList
                   key={campaign.id}
@@ -423,6 +423,7 @@ function CampaignList({ campaign, participations }: CampaignListProps) {
                       participation.isPresent &&
                       participation.campaignid === campaign.id,
                   )}
+                  campaign={campaign}
                 />
               ) : null}
             </div>

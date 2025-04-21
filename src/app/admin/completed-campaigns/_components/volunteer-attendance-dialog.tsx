@@ -17,7 +17,7 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { db } from "@/config/firebase";
 import { getFrame } from "@/helper";
-import type { Participation } from "@/types";
+import type { Campaign, Participation } from "@/types";
 import { type ScoreFormSchema, scoreFormSchema } from "../_lib/validations";
 
 import {
@@ -38,10 +38,12 @@ import { toast } from "sonner";
 
 interface VolunteerAttendanceDialogProps {
   participations: Participation[];
+  campaign: Campaign;
 }
 
 export default function VolunteerAttendanceDialog({
   participations,
+  campaign,
 }: VolunteerAttendanceDialogProps) {
   const form = useForm<ScoreFormSchema>({
     resolver: zodResolver(scoreFormSchema),
@@ -54,19 +56,17 @@ export default function VolunteerAttendanceDialog({
   const handleOnAddScore = async (values: ScoreFormSchema) => {
     setIsPending(true);
 
-    for (const participation of participations) {
-      const userRef = doc(db, "users", participation.uid);
+    if (participations.length >= 1) {
+      for (const participation of participations) {
+        const userRef = doc(db, "users", participation.uid);
 
-      await updateDoc(userRef, {
-        points: increment(values.score),
-      });
+        await updateDoc(userRef, {
+          points: increment(values.score),
+        });
+      }
     }
 
-    const campaignRef = doc(
-      db,
-      "campaigns",
-      participations[0]?.campaignid ?? "",
-    );
+    const campaignRef = doc(db, "campaigns", campaign.id);
 
     await updateDoc(campaignRef, { isScoreApplied: true }).finally(() => {
       setIsPending(false);

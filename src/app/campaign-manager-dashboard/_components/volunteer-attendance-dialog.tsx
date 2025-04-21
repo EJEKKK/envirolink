@@ -1,5 +1,6 @@
 "use client";
 import Image from "next/image";
+import { useRouter } from "next/navigation";
 import * as React from "react";
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -20,7 +21,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { db } from "@/config/firebase";
 import { getFrame } from "@/helper";
 import { participationConverter } from "@/lib/utils";
-import type { Participation } from "@/types";
+import type { Campaign, Participation } from "@/types";
 
 import type { CheckedState } from "@radix-ui/react-checkbox";
 import { format } from "date-fns";
@@ -29,10 +30,12 @@ import { CheckCircleIcon, Loader2, User2Icon } from "lucide-react";
 
 interface VolunteerAttendanceDialogProps {
   participations: Participation[];
+  campaign: Campaign;
 }
 
 export default function VolunteerAttendanceDialog({
   participations,
+  campaign,
 }: VolunteerAttendanceDialogProps) {
   const [selectedVolunteers, setSelectedVolunteers] = React.useState<
     Participation[]
@@ -55,11 +58,7 @@ export default function VolunteerAttendanceDialog({
 
   const handleOnMarkAsDone = async () => {
     setIsPending(true);
-    const campaignRef = doc(
-      db,
-      "campaigns",
-      participations[0]?.campaignid ?? "",
-    );
+    const campaignRef = doc(db, "campaigns", campaign.id);
 
     if (selectedVolunteers.length >= 1) {
       for (const volunteer of selectedVolunteers) {
@@ -84,9 +83,11 @@ export default function VolunteerAttendanceDialog({
 
     await updateDoc(campaignRef, {
       isDone: true,
+    }).finally(() => {
+      setIsPending(true);
+      setOpen(false);
+      window.location.reload();
     });
-    setIsPending(true);
-    setOpen(false);
   };
 
   return (
