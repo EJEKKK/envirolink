@@ -292,7 +292,7 @@ export default function ProfileSection({ userId }: ProfileSectionProps) {
       <h2 className="text-4xl font-bold">Profile</h2>
 
       <Card className="w-full max-w-xl">
-        <CardHeader className="items-center justify-center">
+        <CardHeader className="flex flex-col items-center justify-center">
           <Avatar className="size-18">
             <AvatarImage
               src={user?.profilepictureURL ?? ""}
@@ -433,6 +433,7 @@ function CampaignList({ campaign, participations, user }: CampaignListProps) {
   const [frameTier, setFrameTier] = React.useState<FrameTier>("bronze");
   const [isRankDialogOpen, setIsRankDialogOpen] = React.useState(false);
   const [isLeaving, setIsLeaving] = React.useState(false);
+  const [type, setType] = React.useState<"promote" | "demote">("promote");
 
   // Function to handle leaving a campaign
   const handleOnLeaveCampaign = async (campaignId: string) => {
@@ -458,6 +459,7 @@ function CampaignList({ campaign, participations, user }: CampaignListProps) {
           setIsLeaving(false);
         });
         await updateFrameTier(userRef);
+        setType("demote");
       }
     } catch (error) {
       toast.error("Error leaving campaign. Please try again.");
@@ -468,41 +470,60 @@ function CampaignList({ campaign, participations, user }: CampaignListProps) {
   // Helper function to update frame tier
   async function updateFrameTier(userRef: DocumentReference) {
     const userSnap = await getDoc(userRef);
+    const [silver, gold, platinum, diamond]: Awaited<number[]> =
+      (await Promise.all([
+        (await getDoc(doc(db, "rankDescription", "silver")))?.data()
+          ?.points as Awaited<number>,
+        (await getDoc(doc(db, "rankDescription", "gold")))?.data()
+          ?.points as Awaited<number>,
+        (await getDoc(doc(db, "rankDescription", "platinum")))?.data()
+          ?.points as Awaited<number>,
+        (await getDoc(doc(db, "rankDescription", "diamond")))?.data()
+          ?.points as Awaited<number>,
+      ])) as number[];
+
     if (userSnap.exists()) {
       const points = userSnap.data().points || 0;
       const currentTier = userSnap.data().frameTier as FrameTier;
 
       let tier: FrameTier;
-      if (points >= 5001) {
+      if (points >= (diamond as number)) {
         tier = "diamond";
 
         if (currentTier !== "diamond") {
-          setFrameTier("diamond");
+          type === "promote"
+            ? setFrameTier("diamond")
+            : setFrameTier("platinum");
           setIsRankDialogOpen(true);
         }
-      } else if (points >= 3501) {
+      } else if (points >= (platinum as number)) {
         tier = "platinum";
 
         if (currentTier !== "platinum") {
-          setFrameTier("platinum");
+          type === "promote" ? setFrameTier("platinum") : setFrameTier("gold");
           setIsRankDialogOpen(true);
         }
-      } else if (points >= 1501) {
+      } else if (points >= (gold as number)) {
         tier = "gold";
 
         if (currentTier !== "gold") {
-          setFrameTier("gold");
+          type === "promote" ? setFrameTier("gold") : setFrameTier("silver");
           setIsRankDialogOpen(true);
         }
-      } else if (points >= 501) {
+      } else if (points >= (silver as number)) {
         tier = "silver";
 
         if (currentTier !== "silver") {
-          setFrameTier("silver");
+          type === "promote" ? setFrameTier("silver") : setFrameTier("bronze");
           setIsRankDialogOpen(true);
         }
       } else {
         tier = "bronze";
+
+        if (currentTier !== "bronze") {
+          setFrameTier("bronze");
+          setIsRankDialogOpen(true);
+        }
       }
       await updateDoc(userRef, { frameTier: tier });
     }

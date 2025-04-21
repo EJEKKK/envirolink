@@ -241,7 +241,11 @@ export default function CampaignManagerDashboard() {
             });
           }
 
-          if (category === "new" && !doc.data().isDone) {
+          if (
+            category === "new" &&
+            !doc.data().isDone &&
+            doc.data().description.when.toDate() > new Date()
+          ) {
             newCampaigns.push({
               ...doc.data(),
               id: doc.id,

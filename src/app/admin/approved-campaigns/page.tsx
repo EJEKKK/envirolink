@@ -181,8 +181,7 @@ export default function ApprovedCampaigns() {
         for (const category of categories) {
           if (
             category === "on-going" &&
-            doc.data().description.when.toDate() <= new Date() &&
-            !doc.data().isDone
+            doc.data().description.when.toDate() <= new Date()
           ) {
             newCampaigns.push({
               ...doc.data(),
@@ -201,7 +200,11 @@ export default function ApprovedCampaigns() {
             });
           }
 
-          if (category === "new" && !doc.data().isDone) {
+          if (
+            category === "new" &&
+            !doc.data().isDone &&
+            doc.data().description.when.toDate() > new Date()
+          ) {
             newCampaigns.push({
               ...doc.data(),
               id: doc.id,
@@ -374,10 +377,14 @@ function CampaignList({ campaign }: CampaignListProps) {
 
             <div className="flex items-center gap-2">
               <Badge
-                className="cursor-pointer"
+                className={cn("cursor-pointer")}
                 variant={campaign.isDone ? "outline" : "default"}
               >
-                {campaign.isDone ? "Done" : "New"}
+                {campaign.isDone
+                  ? "Done"
+                  : campaign.description.when.toDate() <= new Date()
+                    ? "Ongoing"
+                    : "New"}
               </Badge>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -519,6 +526,10 @@ function CampaignList({ campaign }: CampaignListProps) {
             open={isDeleteCampaignDialogOpen}
             onOpenChange={setIsDeleteCampaignDialogOpen}
           />
+
+          <p className="text-muted-foreground my-2 text-sm">
+            Submitted by: {campaign.managerDisplayName}
+          </p>
 
           <div className="flex items-center justify-between">
             <p className="text-muted-foreground my-4 text-sm">

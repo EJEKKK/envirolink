@@ -23,7 +23,6 @@ import {
 } from "firebase/firestore";
 import {
   CalendarPlusIcon,
-  Loader2Icon,
   LogOutIcon,
   MessageCircleIcon,
   SendIcon,
@@ -90,8 +89,8 @@ import type {
   User,
 } from "@/types";
 
-import type { DateRange } from "react-day-picker";
 import ScoringLogDialog from "@/components/shared/scoring-log-dialog";
+import type { DateRange } from "react-day-picker";
 
 const CATEGORY_OPTIONS: Array<{
   label: string;
@@ -208,7 +207,11 @@ export default function VounteerDashboard() {
             });
           }
 
-          if (category === "new" && !doc.data().isDone) {
+          if (
+            category === "new" &&
+            !doc.data().isDone &&
+            doc.data().description.when.toDate() > new Date()
+          ) {
             newCampaigns.push({
               ...doc.data(),
               id: doc.id,
