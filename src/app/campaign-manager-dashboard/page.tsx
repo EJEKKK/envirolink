@@ -302,33 +302,33 @@ export default function CampaignManagerDashboard() {
     };
   }, [user, categories, date]);
 
-  // Add a useEffect to fetch likes for each campaign
-  React.useEffect(() => {
-    if (campaigns.length < 1) return;
-
-    const fetchLikes = async () => {
-      const newCampaigns: Campaign[] = [];
-
-      for (const campaign of campaigns) {
-        const likeRef = collection(
-          db,
-          "campaigns",
-          campaign.id,
-          "likes",
-        ).withConverter(likeConverter);
-        const likeSnapshot = await getDocs(likeRef);
-        const likes = likeSnapshot.docs.map((doc) => ({
-          ...doc.data(),
-          id: doc.id,
-        }));
-        newCampaigns.push({ ...campaign, likes });
-      }
-
-      setCampaigns(newCampaigns);
-    };
-
-    void fetchLikes();
-  }, [campaigns]);
+  // // Add a useEffect to fetch likes for each campaign
+  // React.useEffect(() => {
+  //   if (campaigns.length < 1) return;
+  //
+  //   const fetchLikes = async () => {
+  //     const newCampaigns: Campaign[] = [];
+  //
+  //     for (const campaign of campaigns) {
+  //       const likeRef = collection(
+  //         db,
+  //         "campaigns",
+  //         campaign.id,
+  //         "likes",
+  //       ).withConverter(likeConverter);
+  //       const likeSnapshot = await getDocs(likeRef);
+  //       const likes = likeSnapshot.docs.map((doc) => ({
+  //         ...doc.data(),
+  //         id: doc.id,
+  //       }));
+  //       newCampaigns.push({ ...campaign, likes });
+  //     }
+  //
+  //     setCampaigns(newCampaigns);
+  //   };
+  //
+  //   void fetchLikes();
+  // }, [campaigns]);
 
   if (!user) return null;
 
@@ -845,6 +845,8 @@ function CampaignList({ campaign, participations, user }: CampaignListProps) {
         await addScoreLog("like", campaignOptions.like, user, campaignId);
 
         setIsLoading(false);
+
+        window.location.reload();
         return;
       }
 
@@ -853,9 +855,11 @@ function CampaignList({ campaign, participations, user }: CampaignListProps) {
       // If the user has already liked the campaign, change the like type to "dislike"
       if (isCampaignLiked) {
         await updateDoc(likeRef, { type: "dislike" });
+        window.location.reload();
       } else {
         // Otherwise, change the like type to "like"
         await updateDoc(likeRef, { type: "like" });
+        window.location.reload();
       }
 
       const isLikeDataExist = await getDoc(likeRef);
@@ -883,6 +887,8 @@ function CampaignList({ campaign, participations, user }: CampaignListProps) {
         await addScoreLog("like", campaignOptions.like, user, campaignId);
 
         setIsLoading(false);
+
+        window.location.reload();
         return;
       }
 

@@ -173,7 +173,6 @@ export default function CompletedCampaigns() {
 
     const participationQuery = query(
       collection(db, "participation").withConverter(participationConverter),
-      where("uid", "==", user?.uid),
       where("status", "==", "joined"),
     );
 
