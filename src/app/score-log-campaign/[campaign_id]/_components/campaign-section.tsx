@@ -1,6 +1,4 @@
 "use client";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
 import * as React from "react";
 
 import { AspectRatio } from "@/components/ui/aspect-ratio";
@@ -33,7 +31,7 @@ import {
 } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
-import { auth, db } from "@/config/firebase";
+import { db } from "@/config/firebase";
 import { getFrame } from "@/helper";
 import { useIsClient } from "@/hooks/use-is-client";
 import {
@@ -41,10 +39,8 @@ import {
   commentConverter,
   formatCompactNumber,
   participationConverter,
-  userConverter,
 } from "@/lib/utils";
-import type { Comment, User } from "@/types";
-import type { ServerCampaign } from "@/types";
+import type { Comment, ServerCampaign } from "@/types";
 
 import { format, intlFormatDistance } from "date-fns";
 import {
@@ -55,16 +51,13 @@ import {
   query,
   where,
 } from "firebase/firestore";
-import { MessageCircleIcon, UsersRoundIcon } from "lucide-react";
+import { MessageCircleIcon } from "lucide-react";
 
 interface CampaignSectionProps {
   campaign: ServerCampaign;
 }
 
 export default function CampaignSection({ campaign }: CampaignSectionProps) {
-  const currentUser = auth.currentUser;
-
-  const [user, setUser] = React.useState<User | null>(null);
   const [isLightBoxOpen, setIsLightBoxOpen] = React.useState(false);
   const [isCommentDialogOpen, setIsCommentDialogOpen] = React.useState(false);
   const [current, setCurrent] = React.useState(0);
@@ -72,8 +65,6 @@ export default function CampaignSection({ campaign }: CampaignSectionProps) {
   const [shareCount, setShareCount] = React.useState(0);
 
   const isClient = useIsClient();
-
-  const router = useRouter();
 
   function handleOnImageClick(index: number) {
     setIsLightBoxOpen(true);
@@ -84,27 +75,6 @@ export default function CampaignSection({ campaign }: CampaignSectionProps) {
   function getLikesCount() {
     return campaign.likes?.filter((like) => like.type === "like").length ?? 0;
   }
-
-  React.useEffect(() => {
-    if (!currentUser) return;
-    const userRef = doc(db, "users", currentUser.uid).withConverter(
-      userConverter,
-    );
-    const unsub = onSnapshot(userRef, (doc) => {
-      if (doc.exists()) {
-        setUser(doc.data() as User);
-      }
-    });
-
-    return () => unsub();
-  }, [currentUser]);
-
-  React.useEffect(() => {
-    if (!user) return;
-    if (user.uid === campaign.managerUid) {
-      router.push("/campaign-manager-dashboard");
-    }
-  }, [user, campaign.managerUid, router.push]);
 
   // Effect to listen for changes in campaign comments and update state
   React.useEffect(() => {
@@ -250,13 +220,6 @@ export default function CampaignSection({ campaign }: CampaignSectionProps) {
           <Separator />
         </CardContent>
         <CardFooter className="flex flex-col gap-2 sm:flex-row">
-          {!currentUser ? (
-            <Button className="w-full grow cursor-pointer sm:w-auto" asChild>
-              <Link href="/">
-                <UsersRoundIcon /> Join
-              </Link>
-            </Button>
-          ) : null}
           <Button
             className="w-full grow cursor-pointer sm:w-auto"
             variant="ghost"
