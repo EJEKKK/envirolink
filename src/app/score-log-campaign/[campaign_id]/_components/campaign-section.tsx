@@ -171,7 +171,7 @@ export default function CampaignSection({ campaign }: CampaignSectionProps) {
               <p>When:</p>
               <p className="text-primary font-semibold">
                 {format(
-                  campaign.description.when ?? new Date(),
+                  campaign.description.when,
                   "MMM dd, yyyy 'at' hh:mm aaaa",
                 )}
               </p>

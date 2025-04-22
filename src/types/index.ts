@@ -102,7 +102,7 @@ export type Participation = {
   uid: string;
 };
 
-export type InteractionType = "like" | "comment" | "share" | "join";
+export type InteractionType = "like" | "comment" | "share" | "join" | "leave";
 
 export type ScoreHistoryLog = {
   id: string;
@@ -114,4 +114,5 @@ export type ScoreHistoryLog = {
   score: number;
   type: InteractionType;
   createdAt: Timestamp;
+  campaignid: string;
 };

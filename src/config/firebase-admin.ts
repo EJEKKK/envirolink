@@ -8,6 +8,7 @@ import {
   initializeApp,
 } from "firebase-admin/app";
 import { getFirestore } from "firebase-admin/firestore";
+import { getAuth } from "firebase-admin/auth";
 
 const serviceAccount: string | ServiceAccount = {
   projectId: env.FIREBASE_PROJECT_ID,
@@ -22,4 +23,6 @@ const app =
 
 const adminDb = getFirestore(app as App);
 
-export { adminDb };
+const adminAuth = getAuth(app as App);
+
+export { adminDb, adminAuth };

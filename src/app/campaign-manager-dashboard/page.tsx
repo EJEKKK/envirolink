@@ -546,10 +546,12 @@ function CreateCampaignForm({ user }: CreateCampaignFormProps) {
         toast.success("Campaign submitted for approval.");
         form.reset(); // Clear the form
         setIsPosting(false);
+        setIsCreateCampaignOpen(false); // Close the dialog
       });
     } catch (error) {
       toast.error("Error posting campaign. Please try again.");
       setIsPosting(false);
+      setIsCreateCampaignOpen(false); // Close the dialog
     }
   };
 
@@ -840,7 +842,7 @@ function CampaignList({ campaign, participations, user }: CampaignListProps) {
           `You liked the campaign! You earned ${campaignOptions.like} points!`,
         );
 
-        await addScoreLog("like", campaignOptions.like, user);
+        await addScoreLog("like", campaignOptions.like, user, campaignId);
 
         setIsLoading(false);
         return;
@@ -878,7 +880,7 @@ function CampaignList({ campaign, participations, user }: CampaignListProps) {
           `You liked the campaign! You earned ${campaignOptions.like} points!`,
         );
 
-        await addScoreLog("like", campaignOptions.like, user);
+        await addScoreLog("like", campaignOptions.like, user, campaignId);
 
         setIsLoading(false);
         return;
@@ -927,7 +929,7 @@ function CampaignList({ campaign, participations, user }: CampaignListProps) {
         await updateFrameTier(userRef);
         setType("promote");
 
-        await addScoreLog("share", campaignOptions.share, user);
+        await addScoreLog("share", campaignOptions.share, user, campaignId);
 
         // Open the Facebook share dialog
         const url = `https://envirolink-seven.vercel.app/campaign/${campaignId}`;
@@ -1633,7 +1635,7 @@ function CommentsDialog({
         await updateFrameTier(userRef);
         setType("promote");
 
-        await addScoreLog("comment", campaignOptions.comment, user);
+        await addScoreLog("comment", campaignOptions.comment, user, campaignId);
 
         toast.success(
           `Comment added successfully and earned ${campaignOptions.comment} points!`,

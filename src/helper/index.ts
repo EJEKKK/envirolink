@@ -29,6 +29,7 @@ export async function addScoreLog(
   type: InteractionType,
   score: number,
   user: User,
+  campaignId: string,
 ) {
   const scoreLogRef = collection(db, "scoreLog");
 
@@ -41,5 +42,6 @@ export async function addScoreLog(
     score,
     type,
     createdAt: serverTimestamp(),
+    campaignid: campaignId,
   });
 }

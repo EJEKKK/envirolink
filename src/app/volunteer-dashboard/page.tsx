@@ -487,7 +487,7 @@ function CampaignList({ campaign, participations, user }: CampaignListProps) {
           `You liked the campaign! You earned ${campaignOptions.like} points!`,
         );
 
-        await addScoreLog("like", campaignOptions.like, user);
+        await addScoreLog("like", campaignOptions.like, user, campaignId);
 
         setIsLoading(false);
         return;
@@ -525,7 +525,7 @@ function CampaignList({ campaign, participations, user }: CampaignListProps) {
           `You liked the campaign! You earned ${campaignOptions.like} points!`,
         );
 
-        await addScoreLog("like", campaignOptions.like, user);
+        await addScoreLog("like", campaignOptions.like, user, campaignId);
 
         setIsLoading(false);
         return;
@@ -574,7 +574,7 @@ function CampaignList({ campaign, participations, user }: CampaignListProps) {
         await updateFrameTier(userRef);
         setType("promote");
 
-        await addScoreLog("share", campaignOptions.share, user);
+        await addScoreLog("share", campaignOptions.share, user, campaignId);
 
         // Open the Facebook share dialog
         const url = `https://envirolink-seven.vercel.app/campaign/${campaignId}`;
@@ -633,7 +633,7 @@ function CampaignList({ campaign, participations, user }: CampaignListProps) {
         await updateFrameTier(userRef);
         setType("promote");
 
-        await addScoreLog("join", campaignPoints.join, user);
+        await addScoreLog("join", campaignPoints.join, user, campaignId);
 
         toast.success(
           `Successfully joined the campaign and earned ${campaignPoints.join} points!`,
@@ -648,8 +648,6 @@ function CampaignList({ campaign, participations, user }: CampaignListProps) {
 
   // Function to handle leaving a campaign
   const handleOnLeaveCampaign = async (campaignId: string) => {
-    const user = auth.currentUser;
-
     try {
       if (user) {
         const participationId = participations.find(
@@ -669,6 +667,8 @@ function CampaignList({ campaign, participations, user }: CampaignListProps) {
         });
         await updateFrameTier(userRef);
         setType("demote");
+
+        await addScoreLog("leave", 10, user, campaignId);
       }
     } catch (error) {
       toast.error("Error leaving campaign. Please try again.");
@@ -1291,7 +1291,7 @@ function CommentsDialog({
         await updateFrameTier(userRef);
         setType("promote");
 
-        await addScoreLog("comment", campaignOptions.comment, user);
+        await addScoreLog("comment", campaignOptions.comment, user, campaignId);
 
         toast.success(
           `Comment added successfully and earned ${campaignOptions.comment} points!`,

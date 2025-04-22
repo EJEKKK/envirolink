@@ -33,6 +33,7 @@ import {
 } from "firebase/firestore";
 import { useShallow } from "zustand/shallow";
 import { Loader2Icon } from "lucide-react";
+import Link from "next/link";
 
 interface ScoringLogDialogProps {
   user: User;
@@ -90,42 +91,47 @@ export default function ScoringLogDialog({ user }: ScoringLogDialogProps) {
               <Loader2Icon className="text-primary animate-spin" />
             ) : (
               scoreLogs.map((log) => (
-                <Card key={log.id}>
-                  <CardContent className="flex items-center gap-2">
-                    <Avatar>
-                      <AvatarImage
-                        src={log.profilepictureURL}
-                        alt="User Profile Picture"
-                      />
-                      <AvatarFallback>
-                        <Skeleton className="size-full" />
-                      </AvatarFallback>
-                    </Avatar>
-                    <div className="grow">
-                      <div className="flex items-center gap-1">
-                        <p>{log.displayName}</p>
-                        <Image
-                          src={getFrame(log.frameTier)}
-                          alt="Frame Tier"
-                          width={20}
-                          height={20}
+                <Link
+                  key={log.id}
+                  href={`/score-log-campaign/${log.campaignid}`}
+                >
+                  <Card>
+                    <CardContent className="flex items-center gap-2">
+                      <Avatar>
+                        <AvatarImage
+                          src={log.profilepictureURL}
+                          alt="User Profile Picture"
                         />
+                        <AvatarFallback>
+                          <Skeleton className="size-full" />
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="grow">
+                        <div className="flex items-center gap-1">
+                          <p>{log.displayName}</p>
+                          <Image
+                            src={getFrame(log.frameTier)}
+                            alt="Frame Tier"
+                            width={20}
+                            height={20}
+                          />
+                        </div>
+                        <p className="text-muted-foreground text-sm">
+                          {log.email}
+                        </p>
                       </div>
-                      <p className="text-muted-foreground text-sm">
-                        {log.email}
-                      </p>
-                    </div>
-                    <div className="flex flex-col items-end">
-                      <small>{`${log.type.charAt(0).toUpperCase()}${log.type.slice(1)} - ${log.score} pts`}</small>
-                      <small className="text-muted-foreground text-sm">
-                        {format(
-                          log.createdAt?.toDate() ?? new Date(),
-                          "MMM dd, yyyy HH:mm",
-                        )}
-                      </small>
-                    </div>
-                  </CardContent>
-                </Card>
+                      <div className="flex flex-col items-end">
+                        <small>{`${log.type.charAt(0).toUpperCase()}${log.type.slice(1)} - ${log.score} pts`}</small>
+                        <small className="text-muted-foreground text-sm">
+                          {format(
+                            log.createdAt?.toDate() ?? new Date(),
+                            "MMM dd, yyyy HH:mm",
+                          )}
+                        </small>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </Link>
               ))
             )}
           </div>
