@@ -1,6 +1,5 @@
 "use client";
 import Image from "next/image";
-import { useRouter } from "next/navigation";
 import * as React from "react";
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -37,9 +36,8 @@ export default function VolunteerAttendanceDialog({
   participations,
   campaign,
 }: VolunteerAttendanceDialogProps) {
-  const [selectedVolunteers, setSelectedVolunteers] = React.useState<
-    Participation[]
-  >([]);
+  const [selectedVolunteers, setSelectedVolunteers] =
+    React.useState<Participation[]>(participations);
   const [isPending, setIsPending] = React.useState(false);
   const [open, setOpen] = React.useState(false);
 
@@ -105,59 +103,61 @@ export default function VolunteerAttendanceDialog({
           </DialogDescription>
         </DialogHeader>
         <ScrollArea className="h-full max-h-80">
-          {participations.length >= 1 ? (
-            participations.map((participation) => (
-              <div key={participation.id} className="flex items-center gap-2">
-                <Checkbox
-                  id={participation.id}
-                  checked={selectedVolunteers.some(
-                    (sVol) => sVol.id === participation.id,
-                  )}
-                  onCheckedChange={(checked) =>
-                    handleOnValueChange(checked, participation)
-                  }
-                />
-                <Avatar>
-                  <AvatarImage
-                    src={participation.profilepictureURL}
-                    alt="profile_picture"
-                  />
-                  <AvatarFallback>
-                    <User2Icon />
-                  </AvatarFallback>
-                </Avatar>
-                <div className="text-xs">
-                  <Label
-                    className="flex items-center gap-1"
-                    htmlFor={participation.id}
-                  >
-                    <p>{participation.displayName}</p>
-                    <Image
-                      className="inline-block size-4"
-                      src={getFrame(participation.frameTier)}
-                      alt="frame"
-                      priority
-                      height={20}
-                      width={20}
-                    />
-                  </Label>
-
-                  <p className="text-muted-foreground">
-                    {format(
-                      participation.joindate.toDate(),
-                      "'Joined at' MMM dd, yyyy",
+          <div className="flex flex-col gap-2">
+            {participations.length >= 1 ? (
+              participations.map((participation) => (
+                <div key={participation.id} className="flex items-center gap-2">
+                  <Checkbox
+                    id={participation.id}
+                    checked={selectedVolunteers.some(
+                      (sVol) => sVol.id === participation.id,
                     )}
-                  </p>
+                    onCheckedChange={(checked) =>
+                      handleOnValueChange(checked, participation)
+                    }
+                  />
+                  <Avatar>
+                    <AvatarImage
+                      src={participation.profilepictureURL}
+                      alt="profile_picture"
+                    />
+                    <AvatarFallback>
+                      <User2Icon />
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="text-xs">
+                    <Label
+                      className="flex items-center gap-1"
+                      htmlFor={participation.id}
+                    >
+                      <p>{participation.displayName}</p>
+                      <Image
+                        className="inline-block size-4"
+                        src={getFrame(participation.frameTier)}
+                        alt="frame"
+                        priority
+                        height={20}
+                        width={20}
+                      />
+                    </Label>
+
+                    <p className="text-muted-foreground">
+                      {format(
+                        participation.joindate.toDate(),
+                        "'Joined at' MMM dd, yyyy",
+                      )}
+                    </p>
+                  </div>
                 </div>
+              ))
+            ) : (
+              <div className="flex justify-center">
+                <p className="text-muted-foreground">
+                  No joined volunteers to show
+                </p>
               </div>
-            ))
-          ) : (
-            <div className="flex justify-center">
-              <p className="text-muted-foreground">
-                No joined volunteers to show
-              </p>
-            </div>
-          )}
+            )}
+          </div>
         </ScrollArea>
         <DialogFooter>
           <DialogClose asChild>

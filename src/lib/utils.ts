@@ -13,6 +13,7 @@ import type {
   Like,
   Participation,
   Points,
+  RankDescription,
   ScoreHistoryLog,
   User,
 } from "@/types";
@@ -105,6 +106,20 @@ export const scoreHistoryLogConverter: FirestoreDataConverter<ScoreHistoryLog> =
       const data = snapshot.data(options);
 
       return data as ScoreHistoryLog;
+    },
+  };
+
+export const rankDescriptionConverter: FirestoreDataConverter<RankDescription> =
+  {
+    toFirestore: (rankDescription: WithFieldValue<RankDescription>) =>
+      rankDescription,
+    fromFirestore: (
+      snapshot: QueryDocumentSnapshot,
+      options: SnapshotOptions,
+    ) => {
+      const data = snapshot.data(options);
+
+      return data as RankDescription;
     },
   };
 

@@ -76,21 +76,21 @@ function CampaignSidebarGroup() {
       <SidebarGroupLabel>Campaign</SidebarGroupLabel>
       <SidebarGroupContent>
         <SidebarMenu>
+          {/* <SidebarMenuItem> */}
+          {/*   <SidebarMenuButton asChild> */}
+          {/*     <Link href="/admin/completed-campaigns">Completed campaigns</Link> */}
+          {/*   </SidebarMenuButton> */}
+          {/* </SidebarMenuItem> */}
           <SidebarMenuItem>
             <SidebarMenuButton asChild>
-              <Link href="/admin/completed-campaigns">Completed campaigns</Link>
+              <Link href="/admin/campaigns">Campaigns</Link>
             </SidebarMenuButton>
           </SidebarMenuItem>
-          <SidebarMenuItem>
-            <SidebarMenuButton asChild>
-              <Link href="/admin/approved-campaigns">Approved campaigns</Link>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-          <SidebarMenuItem>
-            <SidebarMenuButton asChild>
-              <Link href="/admin/pending-campaigns">Pending campaigns</Link>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
+          {/* <SidebarMenuItem> */}
+          {/*   <SidebarMenuButton asChild> */}
+          {/*     <Link href="/admin/pending-campaigns">Pending campaigns</Link> */}
+          {/*   </SidebarMenuButton> */}
+          {/* </SidebarMenuItem> */}
         </SidebarMenu>
       </SidebarGroupContent>
     </SidebarGroup>

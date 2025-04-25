@@ -1,10 +1,10 @@
 "use client";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import * as React from "react";
 
+import { zodResolver } from "@hookform/resolvers/zod";
 import { format, intlFormatDistance, isAfter, isBefore } from "date-fns";
-import { onAuthStateChanged, signOut } from "firebase/auth";
+import { onAuthStateChanged } from "firebase/auth";
 import {
   type DocumentReference,
   addDoc,
@@ -22,20 +22,21 @@ import {
   where,
 } from "firebase/firestore";
 import {
-  CalendarPlusIcon,
-  LogOutIcon,
+  Edit2Icon,
+  EllipsisIcon,
+  Loader2Icon,
   MessageCircleIcon,
+  PlusCircleIcon,
   SendIcon,
-  Share2Icon,
-  ThumbsUpIcon,
+  TrashIcon,
   XIcon,
 } from "lucide-react";
+import type { DateRange } from "react-day-picker";
+import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 
 import DateRangePicker from "@/components/date-range-picker";
 import { MultiSelect } from "@/components/multi-select";
-import Navbar from "@/components/shared/navbar";
-import ScoringLogDialog from "@/components/shared/scoring-log-dialog";
 import { AspectRatio } from "@/components/ui/aspect-ratio";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -65,12 +66,28 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
+import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { auth, db } from "@/config/firebase";
-import { addScoreLog, getFrame } from "@/helper";
+import { getFrame } from "@/helper";
 import {
   campaignConverter,
   cn,
@@ -89,9 +106,12 @@ import type {
   Points,
   User,
 } from "@/types";
-import JoinedVolunteerList from "./_components/joined-volunteer-list";
-
-import type { DateRange } from "react-day-picker";
+import { type PointFormSchema, pointFormSchema } from "../_lib/validations";
+import DeleteCampaignDialog from "./_components/delete-campaign-dialog";
+import EditCampaignDialog from "./_components/edit-campaign-dialog";
+import VolunteerAttendanceDialog from "./_components/volunteer-attendance-dialog";
+import AcceptCampaignDialog from "./_components/accept-campaign-dialog";
+import RejectCampaignDialog from "./_components/reject-campaign-dialog";
 
 const CATEGORY_OPTIONS: Array<{
   label: string;
@@ -103,14 +123,16 @@ const CATEGORY_OPTIONS: Array<{
   { label: "Done", value: "done" },
 ];
 
-export default function VounteerDashboard() {
+export default function Campaigns() {
   const router = useRouter();
+
   const [user, setUser] = React.useState<User | null>(null);
   const [campaigns, setCampaigns] = React.useState<Campaign[]>([]);
   const [participations, setParticipations] = React.useState<Participation[]>(
     [],
   );
   const [date, setDate] = React.useState<DateRange | undefined>();
+  const [isFetching, setIsFetching] = React.useState(false);
 
   //Filter State
   const [categories, setCategories] = React.useState<string[]>([]);
@@ -123,15 +145,8 @@ export default function VounteerDashboard() {
         return;
       }
 
-      const userRef = doc(db, "users", user?.uid as string).withConverter(
-        userConverter,
-      );
+      const userRef = doc(db, "users", user!.uid).withConverter(userConverter);
       onSnapshot(userRef, (doc) => {
-        if (doc.data()?.blocked) {
-          toast.error("Your account has been blocked.");
-          void signOut(auth);
-        }
-
         const userData = doc.data();
         setUser({ ...userData, uid: doc.id } as User);
       });
@@ -143,6 +158,8 @@ export default function VounteerDashboard() {
   // Effect to handle real-time updates to campaigns collection
   React.useEffect(() => {
     if (!user) return;
+
+    setIsFetching(true);
 
     const getLikes = async (docId: string) => {
       const likeRef = collection(db, "campaigns", docId, "likes").withConverter(
@@ -166,17 +183,20 @@ export default function VounteerDashboard() {
       ).withConverter(pointsConverter);
 
       const pointsSnapshot = await getDocs(pointsRef);
-      const points = pointsSnapshot.docs[0]?.data() as Points;
+      const points = {
+        ...pointsSnapshot.docs[0]?.data(),
+        id: pointsSnapshot.docs[0]?.id,
+      } as Points;
 
       return points;
     };
 
     const campaignQuery = query(
       collection(db, "campaigns").withConverter(campaignConverter),
-      where("status", "==", "approved"),
       orderBy("createdAt", "desc"),
     );
     const unsubCampaign = onSnapshot(campaignQuery, async (snapshot) => {
+      setIsFetching(true);
       const newCampaigns: Campaign[] = [];
 
       for (const doc of snapshot.docs) {
@@ -186,8 +206,8 @@ export default function VounteerDashboard() {
         for (const category of categories) {
           if (
             category === "on-going" &&
-            doc.data().description.when.toDate() <= new Date() &&
-            !doc.data().isDone
+            !doc.data().isDone &&
+            doc.data().description.when.toDate() <= new Date()
           ) {
             newCampaigns.push({
               ...doc.data(),
@@ -233,14 +253,15 @@ export default function VounteerDashboard() {
         );
 
         setCampaigns(filteredByWhenCampaigns);
+        setIsFetching(false);
       } else {
         setCampaigns(newCampaigns);
+        setIsFetching(false);
       }
     });
 
     const participationQuery = query(
       collection(db, "participation").withConverter(participationConverter),
-      where("uid", "==", user?.uid),
       where("status", "==", "joined"),
     );
 
@@ -262,64 +283,14 @@ export default function VounteerDashboard() {
     };
   }, [user, categories, date]);
 
-  // // Add a useEffect to fetch likes for each campaign
-  // React.useEffect(() => {
-  //   if (campaigns.length < 1) return;
-  //
-  //   const fetchLikes = async () => {
-  //     const newCampaigns: Campaign[] = [];
-  //
-  //     for (const campaign of campaigns) {
-  //       const likeRef = collection(
-  //         db,
-  //         "campaigns",
-  //         campaign.id,
-  //         "likes",
-  //       ).withConverter(likeConverter);
-  //       const likeSnapshot = await getDocs(likeRef);
-  //       const likes = likeSnapshot.docs.map((doc) => ({
-  //         ...doc.data(),
-  //         id: doc.id,
-  //       }));
-  //       newCampaigns.push({ ...campaign, likes });
-  //     }
-  //
-  //     setCampaigns(newCampaigns);
-  //   };
-  //
-  //   void fetchLikes();
-  // }, [campaigns]);
-
-  if (!user) return null;
-
   return (
-    <main className="flex flex-col items-center gap-4">
-      <Navbar user={user} />
-      <Card
-        className={cn(
-          "hidden w-full max-w-2xl",
-          user.status === "pending" && "flex",
-        )}
-      >
-        <CardContent>
-          <CardTitle className="text-center text-4xl font-bold">
-            Pending for Approval
-          </CardTitle>
-          <CardDescription>
-            {user.status === "rejected" ? (
-              <p className="text-muted-foreground text-center text-lg font-bold">
-                Your account has been rejected.
-              </p>
-            ) : (
-              <p className="text-muted-foreground text-center text-lg font-bold">
-                Your account is pending approval.
-              </p>
-            )}
-          </CardDescription>
-        </CardContent>
-      </Card>
-
-      <ScoringLogDialog user={user} />
+    <>
+      <header className="flex h-16 shrink-0 items-center gap-2 transition-[width,height] ease-linear group-has-[[data-collapsible=icon]]/sidebar-wrapper:h-12">
+        <div className="flex items-center gap-2 px-4">
+          <SidebarTrigger className="-ml-1" />
+          <h4 className="text-lg font-semibold">Approved Campaigns</h4>
+        </div>
+      </header>
 
       {/* Campaign List */}
       <section className="flex w-full flex-col items-center gap-4 p-4">
@@ -351,373 +322,131 @@ export default function VounteerDashboard() {
           </div>
         </div>
 
-        <Tabs className="container w-full" defaultValue="all">
-          <TabsList className="grid w-fit grid-cols-2 justify-self-end">
-            <TabsTrigger value="all">All</TabsTrigger>
-            <TabsTrigger value="joined-campaigns">Joined Campaigns</TabsTrigger>
+        <Tabs className="w-full" defaultValue="approved">
+          <TabsList>
+            <TabsTrigger value="approved">Approved</TabsTrigger>
+            <TabsTrigger value="pending">Pending</TabsTrigger>
+            <TabsTrigger value="complete">Complete</TabsTrigger>
           </TabsList>
           <TabsContent
-            className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3"
-            value="all"
+            className="container grid w-full grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3"
+            value="approved"
           >
-            {campaigns.length >= 1 ? (
-              campaigns.map((campaign) => (
-                <CampaignList
-                  key={campaign.id}
-                  campaign={campaign}
-                  participations={participations}
-                  user={user}
-                />
-              ))
+            {isFetching ? (
+              <div className="flex items-center justify-center md:col-span-2 lg:col-span-3">
+                <Loader2Icon className="text-primary animate-spin" />
+              </div>
+            ) : campaigns.filter((campaign) => campaign.status === "approved")
+                .length >= 1 ? (
+              campaigns
+                .filter((campaign) => campaign.status === "approved")
+                .map((campaign) => (
+                  <CampaignList
+                    key={campaign.id}
+                    campaign={campaign}
+                    participations={participations}
+                  />
+                ))
             ) : (
-              <div className="text-muted-foreground flex items-center justify-center md:col-span-2 lg:col-span-3">
-                No campaigns to show
+              <div className="text-center md:col-span-2 lg:col-span-3">
+                <h4 className="text-muted-foreground text-lg font-bold">
+                  No campaigns to show
+                </h4>
               </div>
             )}
           </TabsContent>
           <TabsContent
-            className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3"
-            value="joined-campaigns"
+            className="container grid w-full grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3"
+            value="pending"
           >
-            {campaigns.filter((campaign) =>
-              participations.some(
-                (participation) =>
-                  participation.campaignid === campaign.id &&
-                  participation.uid === user.uid,
-              ),
-            ).length >= 1 ? (
+            {isFetching ? (
+              <div className="flex items-center justify-center md:col-span-2 lg:col-span-3">
+                <Loader2Icon className="text-primary animate-spin" />
+              </div>
+            ) : campaigns.filter((campaign) => campaign.status === "pending")
+                .length >= 1 ? (
               campaigns
-                .filter((campaign) =>
-                  participations.some(
-                    (participation) =>
-                      participation.campaignid === campaign.id &&
-                      participation.uid === user.uid,
-                  ),
+                .filter((campaign) => campaign.status === "pending")
+                .map((campaign) => (
+                  <CampaignList
+                    key={campaign.id}
+                    campaign={campaign}
+                    participations={participations}
+                  />
+                ))
+            ) : (
+              <div className="text-center md:col-span-2 lg:col-span-3">
+                <h4 className="text-muted-foreground text-lg font-bold">
+                  No campaigns to show
+                </h4>
+              </div>
+            )}
+          </TabsContent>
+          <TabsContent
+            className="container grid w-full grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3"
+            value="complete"
+          >
+            {isFetching ? (
+              <div className="flex items-center justify-center md:col-span-2 lg:col-span-3">
+                <Loader2Icon className="text-primary animate-spin" />
+              </div>
+            ) : campaigns.filter(
+                (campaign) => campaign.isScoreApplied && campaign.isDone,
+              ).length >= 1 ? (
+              campaigns
+                .filter(
+                  (campaign) => campaign.isScoreApplied && campaign.isDone,
                 )
                 .map((campaign) => (
                   <CampaignList
                     key={campaign.id}
                     campaign={campaign}
                     participations={participations}
-                    user={user}
                   />
                 ))
             ) : (
-              <div className="text-muted-foreground flex items-center justify-center md:col-span-2 lg:col-span-3">
-                You don't have any joined campaigns yet
+              <div className="text-center md:col-span-2 lg:col-span-3">
+                <h4 className="text-muted-foreground text-lg font-bold">
+                  No campaigns to show
+                </h4>
               </div>
             )}
           </TabsContent>
         </Tabs>
       </section>
-    </main>
+    </>
   );
 }
 
 interface CampaignListProps {
   campaign: Campaign;
   participations: Participation[];
-  user: User;
 }
 
-function CampaignList({ campaign, participations, user }: CampaignListProps) {
-  const [isLoading, setIsLoading] = React.useState(false);
+function CampaignList({ campaign, participations }: CampaignListProps) {
+  const form = useForm<PointFormSchema>({
+    resolver: zodResolver(pointFormSchema),
+    defaultValues: {
+      points: { like: 0, comment: 0, share: 0, campaignManager: 20 },
+    },
+  });
+
   const [isLightBoxOpen, setIsLightBoxOpen] = React.useState(false);
   const [isCommentDialogOpen, setIsCommentDialogOpen] = React.useState(false);
+  const [isDeleteCampaignDialogOpen, setIsDeleteCampaignDialogOpen] =
+    React.useState(false);
   const [current, setCurrent] = React.useState(0);
-  const [frameTier, setFrameTier] = React.useState<FrameTier>("bronze");
-  const [isRankDialogOpen, setIsRankDialogOpen] = React.useState(false);
-  const [type, setType] = React.useState<"promote" | "demote">("promote");
   const [comments, setComments] = React.useState<Comment[]>([]);
   const [shareCount, setShareCount] = React.useState(0);
-  const [isVolunteerDialogOpened, setIsSetVolunteerDialogOpened] =
+  const [editScoreOpen, setEditScoreOpen] = React.useState(false);
+  const [isVolunteerListOpened, setIsVolunteerListOpened] =
     React.useState(false);
-
-  const isAlreadyJoined = participations.some(
-    (part) => part.campaignid === campaign.id,
-  );
+  const [isAcceptDialogOpen, setIsAcceptDialogOpen] = React.useState(false);
+  const [isRejectDialogOpen, setIsRejectDialogOpen] = React.useState(false);
 
   function handleOnImageClick(index: number) {
     setIsLightBoxOpen(true);
     setCurrent(index);
-  }
-
-  // Function to handle liking a campaign
-  const handleOnLikeCampaign = async (campaignId: string) => {
-    setIsLoading(true);
-    const optionsRef = collection(
-      db,
-      "campaigns",
-      campaignId,
-      "points",
-    ).withConverter(pointsConverter);
-    const campaignOptions = (
-      await getDocs(optionsRef)
-    ).docs[0]!.data() as Points;
-
-    try {
-      const isCampaignLiked = campaign.likes?.some(
-        (like) => like.uid === user?.uid && like.type === "like", // Check if the user has liked the campaign
-      );
-
-      // Find the like ID if the user has already liked the campaign
-      const likeId = campaign.likes?.find(
-        (like) => like.uid === user?.uid,
-      )?.id!;
-
-      // Check if the campaign has no likes
-      if (campaign.likes?.length === 0 || !likeId) {
-        // If the campaign has no likes, add a new like document
-        const likeRef = collection(db, "campaigns", campaignId, "likes");
-        await addDoc(likeRef, { uid: user?.uid!, type: "like" });
-
-        // Update user points based on campaign like points
-        await updateDoc(doc(db, "users", user!.uid), {
-          points: increment(campaignOptions.like),
-        });
-
-        // Update user's frame tier based on their new points total
-        await updateFrameTier(doc(db, "users", user!.uid));
-        setType("promote");
-
-        toast.success(
-          `You liked the campaign! You earned ${campaignOptions.like} points!`,
-        );
-
-        await addScoreLog("like", campaignOptions.like, user, campaignId);
-
-        setIsLoading(false);
-
-        window.location.reload();
-        return;
-      }
-
-      const likeRef = doc(db, "campaigns", campaignId, "likes", likeId);
-
-      // If the user has already liked the campaign, change the like type to "dislike"
-      if (isCampaignLiked) {
-        await updateDoc(likeRef, { type: "dislike" });
-        window.location.reload();
-      } else {
-        // Otherwise, change the like type to "like"
-        await updateDoc(likeRef, { type: "like" });
-        window.location.reload();
-      }
-
-      const isLikeDataExist = await getDoc(likeRef);
-
-      // If the like document does not exist, create a new one
-      if (!isLikeDataExist) {
-        addDoc(collection(db, "campaigns", campaignId, "likes"), {
-          uid: user?.uid!,
-          type: "like",
-        });
-
-        // Update user points based on campaign like points
-        await updateDoc(doc(db, "users", user!.uid), {
-          points: increment(campaignOptions.like),
-        });
-
-        // Update user's frame tier based on their new points total
-        await updateFrameTier(doc(db, "users", user!.uid));
-        setType("promote");
-
-        toast.success(
-          `You liked the campaign! You earned ${campaignOptions.like} points!`,
-        );
-
-        await addScoreLog("like", campaignOptions.like, user, campaignId);
-
-        setIsLoading(false);
-
-        window.location.reload();
-        return;
-      }
-
-      setIsLoading(false);
-    } catch (error) {
-      toast.error("Error liking campaign. Please try again.");
-      setIsLoading(false);
-    }
-  };
-
-  // Function to handle sharing a campaign
-  const handleOnShareCampaign = async (campaignId: string) => {
-    setIsLoading(true);
-    const optionsRef = collection(
-      db,
-      "campaigns",
-      campaignId,
-      "points",
-    ).withConverter(pointsConverter);
-    const campaignOptions = (
-      await getDocs(optionsRef)
-    ).docs[0]!.data() as Points;
-
-    if (user) {
-      try {
-        const campaignRef = doc(db, "campaigns", campaignId);
-        const campaignSnapshot = await getDoc(campaignRef);
-        const campaignData = campaignSnapshot.data();
-
-        // Log share to participation
-        await addDoc(collection(db, "participation"), {
-          campaignid: campaignId,
-          uid: user.uid,
-          displayName: user.displayName || "Anonymous",
-          joinDate: serverTimestamp(),
-          status: "shared",
-        });
-
-        // Award points based on campaign share points
-        const userRef = doc(db, "users", user.uid);
-        await updateDoc(userRef, {
-          points: increment(campaignOptions.share),
-        });
-        await updateFrameTier(userRef);
-        setType("promote");
-
-        await addScoreLog("share", campaignOptions.share, user, campaignId);
-
-        // Open the Facebook share dialog
-        const url = `https://envirolink-seven.vercel.app/campaign/${campaignId}`;
-        const shareUrl = `https://www.facebook.com/sharer/sharer.php?u=${url}?e=${encodeURIComponent(
-          campaignData?.title ?? "",
-        )}`;
-        window.open(shareUrl, "_blank", "width=600,height=400");
-
-        toast.success(
-          `Campaign shared successfully and earned ${campaignOptions.share} points!`,
-        );
-        setIsLoading(false);
-      } catch (error) {
-        console.error("Error sharing campaign:", error);
-        toast.error("Error sharing campaign. Please try again.");
-        setIsLoading(false);
-      }
-    } else {
-      toast.error("You must be logged in to share a campaign.");
-      setIsLoading(false);
-    }
-  };
-
-  // Function to handle joining a campaign
-  const handleOnJoinCampaign = async (campaignId: string) => {
-    if (user) {
-      try {
-        const displayName = user.displayName || "Anonymous";
-        const uid = user.uid;
-        const frameTier = user.frameTier;
-        const profilepictureURL = user.profilepictureURL;
-
-        // Add a new participation record
-        await addDoc(collection(db, "participation"), {
-          campaignid: campaignId,
-          uid,
-          displayName,
-          joindate: serverTimestamp(),
-          status: "joined",
-          isPresent: false,
-          frameTier,
-          profilepictureURL,
-        });
-      } catch (error) {
-        toast.error("Error joining campaign. Please try again.");
-      }
-    } else {
-      toast.error("You must be logged in to join a campaign.");
-    }
-  };
-
-  // Function to handle leaving a campaign
-  const handleOnLeaveCampaign = async (campaignId: string) => {
-    try {
-      if (user) {
-        const participationId = participations.find(
-          (participation) => participation.campaignid === campaignId,
-        )!.id;
-
-        const uid = user!.uid;
-
-        // Remove the participation record from Firestore
-        await deleteDoc(doc(db, "participation", participationId)).catch(() => {
-          toast.error("Error leaving campaign. Please try again.");
-        });
-
-        const userRef = doc(db, "users", uid).withConverter(userConverter);
-        await updateDoc(userRef, { points: increment(-10) }).finally(() => {
-          toast.success("Successfully left the campaign and lost 10 points");
-        });
-        await updateFrameTier(userRef);
-        setType("demote");
-
-        await addScoreLog("leave", 10, user, campaignId);
-      }
-    } catch (error) {
-      toast.error("Error leaving campaign. Please try again.");
-    }
-  };
-
-  // Helper function to update frame tier
-  async function updateFrameTier(userRef: DocumentReference) {
-    const userSnap = await getDoc(userRef);
-    const [silver, gold, platinum, diamond]: Awaited<number[]> =
-      (await Promise.all([
-        (await getDoc(doc(db, "rankDescription", "silver")))?.data()
-          ?.points as Awaited<number>,
-        (await getDoc(doc(db, "rankDescription", "gold")))?.data()
-          ?.points as Awaited<number>,
-        (await getDoc(doc(db, "rankDescription", "platinum")))?.data()
-          ?.points as Awaited<number>,
-        (await getDoc(doc(db, "rankDescription", "diamond")))?.data()
-          ?.points as Awaited<number>,
-      ])) as number[];
-
-    if (userSnap.exists()) {
-      const points = userSnap.data().points || 0;
-      const currentTier = userSnap.data().frameTier as FrameTier;
-
-      let tier: FrameTier;
-      if (points >= (diamond as number)) {
-        tier = "diamond";
-
-        if (currentTier !== "diamond") {
-          type === "promote"
-            ? setFrameTier("diamond")
-            : setFrameTier("platinum");
-          setIsRankDialogOpen(true);
-        }
-      } else if (points >= (platinum as number)) {
-        tier = "platinum";
-
-        if (currentTier !== "platinum") {
-          type === "promote" ? setFrameTier("platinum") : setFrameTier("gold");
-          setIsRankDialogOpen(true);
-        }
-      } else if (points >= (gold as number)) {
-        tier = "gold";
-
-        if (currentTier !== "gold") {
-          type === "promote" ? setFrameTier("gold") : setFrameTier("silver");
-          setIsRankDialogOpen(true);
-        }
-      } else if (points >= (silver as number)) {
-        tier = "silver";
-
-        if (currentTier !== "silver") {
-          type === "promote" ? setFrameTier("silver") : setFrameTier("bronze");
-          setIsRankDialogOpen(true);
-        }
-      } else {
-        tier = "bronze";
-
-        if (currentTier !== "bronze") {
-          setFrameTier("bronze");
-          setIsRankDialogOpen(true);
-        }
-      }
-      await updateDoc(userRef, { frameTier: tier });
-    }
   }
 
   // Function to get the count of likes for a campaign
@@ -731,17 +460,21 @@ function CampaignList({ campaign, participations, user }: CampaignListProps) {
     const commentsRef = collection(db, "comments").withConverter(
       commentConverter,
     );
-    const commentsQuery = query(
-      commentsRef,
-      where("campaignRef", "==", campaignRef),
-      orderBy("timestamp", "desc"),
-    );
-    const unsub = onSnapshot(commentsQuery, async (snapshot) => {
-      const comments = snapshot.docs.map((doc) => ({
-        ...doc.data(),
-        id: doc.id,
-      }));
-      setComments(comments);
+    const unsub = onSnapshot(campaignRef, (doc) => {
+      if (doc.exists()) {
+        const commentQuery = query(
+          commentsRef,
+          where("campaignRef", "==", campaignRef),
+          orderBy("timestamp", "desc"),
+        ).withConverter(commentConverter);
+        onSnapshot(commentQuery, (snapshot) => {
+          const comments = snapshot.docs.map((doc) => ({
+            ...doc.data(),
+            id: doc.id,
+          }));
+          setComments(comments);
+        });
+      }
     });
 
     return () => unsub();
@@ -766,25 +499,10 @@ function CampaignList({ campaign, participations, user }: CampaignListProps) {
 
   return (
     <div className="flex w-full max-w-2xl flex-col gap-4">
-      <Card className="w-full">
+      <Card className="w-full max-w-2xl">
         <CardHeader>
           <CardTitle className="flex items-center justify-between font-bold">
-            <div className="flex items-center gap-2">
-              <Link href={`/profile/${campaign.managerUid}`}>
-                <Avatar>
-                  <AvatarImage src={campaign.managerPhotoURL} />
-                  <AvatarFallback>
-                    {campaign.managerDisplayName.slice(0, 2)}
-                  </AvatarFallback>
-                </Avatar>
-              </Link>
-              <div>
-                <p className="text-sm font-semibold">
-                  {campaign.managerDisplayName ?? "Anonymous"}
-                </p>
-                <p className="text-sm">{campaign.title}</p>
-              </div>
-            </div>
+            <p>{campaign.title}</p>
 
             <div className="flex items-center gap-2">
               <Badge
@@ -797,89 +515,86 @@ function CampaignList({ campaign, participations, user }: CampaignListProps) {
                     ? "Ongoing"
                     : "New"}
               </Badge>
-              {campaign.isDone ? null : (
-                <Button
-                  variant="ghost"
-                  onClick={() =>
-                    isAlreadyJoined
-                      ? void handleOnLeaveCampaign(campaign.id)
-                      : void handleOnJoinCampaign(campaign.id)
-                  }
-                  disabled={isLoading}
-                >
-                  {isAlreadyJoined ? (
-                    <>
-                      <LogOutIcon /> Leave Campaign
-                    </>
-                  ) : (
-                    <>
-                      <CalendarPlusIcon /> Join Campaign
-                    </>
-                  )}
-                </Button>
-              )}
+              <DropdownMenu>
+                {campaign.status !== "pending" && (
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="icon">
+                      <EllipsisIcon />
+                    </Button>
+                  </DropdownMenuTrigger>
+                )}
+                <DropdownMenuContent>
+                  {campaign.isDone && !campaign.isScoreApplied ? (
+                    <DropdownMenuItem
+                      onClick={() => setIsVolunteerListOpened(true)}
+                    >
+                      <PlusCircleIcon /> Add score
+                    </DropdownMenuItem>
+                  ) : null}
+                  <DropdownMenuItem onClick={() => setEditScoreOpen(true)}>
+                    <Edit2Icon /> Edit campaign scores
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    className="text-destructive focus:text-destructive"
+                    onClick={() => setIsDeleteCampaignDialogOpen(true)}
+                  >
+                    <TrashIcon className="text-destructive" /> Delete campaign
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
           </CardTitle>
           <Separator className="my-2" />
-          <CardDescription className="grid gap-4 sm:grid-cols-2">
-            <div>
-              <p>What:</p>
-              <p className="text-primary font-semibold">
-                {campaign.description.what}
-              </p>
-            </div>
+          <CardDescription className="flex w-full flex-col gap-4">
+            <div className="grid gap-4 text-sm md:grid-cols-2">
+              <div>
+                <p>What:</p>
+                <p className="text-primary font-semibold">
+                  {campaign.description.what}
+                </p>
+              </div>
 
-            <div>
-              <p>When:</p>
-              <p className="text-primary font-semibold">
-                {format(
-                  campaign.description.when.toDate(),
-                  "MMM dd, yyyy 'at' hh:mm aaaa",
-                )}
-              </p>
-            </div>
+              <div>
+                <p>When:</p>
+                <p className="text-primary font-semibold">
+                  {format(
+                    campaign.description.when.toDate(),
+                    "MMM dd, yyyy 'at' hh:mm aaaa",
+                  )}
+                </p>
+              </div>
 
-            <div>
-              <p>Where:</p>
-              <p className="text-primary font-semibold">
-                {campaign.description.where}
-              </p>
+              <div>
+                <p>Where:</p>
+                <p className="text-primary font-semibold">
+                  {campaign.description.where}
+                </p>
+              </div>
             </div>
+            <Separator />
+            <div className="grid gap-4 text-sm md:grid-cols-2">
+              <div>
+                <p>Like</p>
+                <p className="text-primary font-semibold">
+                  {campaign.points?.like ?? 0} pts
+                </p>
+              </div>
 
-            <Button onClick={() => setIsSetVolunteerDialogOpened(true)}>
-              View joined volunteers
-            </Button>
-            <JoinedVolunteerList
-              open={isVolunteerDialogOpened}
-              onOpenChange={setIsSetVolunteerDialogOpened}
-              participations={participations.filter(
-                (participation) => participation.campaignid === campaign.id,
-              )}
-            />
+              <div>
+                <p>Comment</p>
+                <p className="text-primary font-semibold">
+                  {campaign.points?.comment ?? 0} pts
+                </p>
+              </div>
+
+              <div>
+                <p>Share</p>
+                <p className="text-primary font-semibold">
+                  {campaign.points?.share ?? 0} pts
+                </p>
+              </div>
+            </div>
           </CardDescription>
-          <Separator />
-          <div className="grid gap-4 text-sm md:grid-cols-2">
-            <div>
-              <p>Like</p>
-              <p className="text-primary font-semibold">
-                {campaign.points?.like} pts
-              </p>
-            </div>
-
-            <div>
-              <p>Comment</p>
-              <p className="text-primary font-semibold">
-                {campaign.points?.comment} pts
-              </p>
-            </div>
-
-            <div>
-              <p>Share</p>
-              <p className="text-primary font-semibold">
-                {campaign.points?.share} pts
-              </p>
-            </div>
-          </div>
         </CardHeader>
         <CardContent>
           {campaign.photoURLs.length >= 1 ? (
@@ -895,9 +610,9 @@ function CampaignList({ campaign, participations, user }: CampaignListProps) {
                   key={index}
                   onClick={() => handleOnImageClick(index)}
                 >
-                  <AspectRatio ratio={16 / 9}>
+                  <AspectRatio ratio={1 / 1}>
                     <img
-                      className="size-full object-cover object-center"
+                      className="h-full object-cover object-center"
                       src={photo}
                       alt="campaign image"
                     />
@@ -925,19 +640,38 @@ function CampaignList({ campaign, participations, user }: CampaignListProps) {
             activeIndex={current}
           />
 
+          <VolunteerAttendanceDialog
+            open={isVolunteerListOpened}
+            onOpenChange={setIsVolunteerListOpened}
+            participations={participations.filter(
+              (participation) =>
+                participation.isPresent &&
+                participation.campaignid === campaign.id,
+            )}
+            campaign={campaign}
+          />
+
           <CommentsDialog
             campaignId={campaign.id}
-            user={user}
             open={isCommentDialogOpen}
             onOpenChange={setIsCommentDialogOpen}
           />
 
-          <RankBadgeDialog
-            open={isRankDialogOpen}
-            onOpenChange={setIsRankDialogOpen}
-            frameTier={frameTier}
-            type={type}
+          <EditCampaignDialog
+            campaign={campaign}
+            open={editScoreOpen}
+            onOpenChange={setEditScoreOpen}
           />
+
+          <DeleteCampaignDialog
+            campaignId={campaign.id}
+            open={isDeleteCampaignDialogOpen}
+            onOpenChange={setIsDeleteCampaignDialogOpen}
+          />
+
+          <p className="text-muted-foreground my-2 text-sm">
+            Submitted by: {campaign.managerDisplayName}
+          </p>
 
           <div className="flex items-center justify-between">
             <p className="text-muted-foreground my-4 text-sm">
@@ -950,36 +684,111 @@ function CampaignList({ campaign, participations, user }: CampaignListProps) {
               Shares: {formatCompactNumber(shareCount)}
             </p>
           </div>
-          <Separator />
-        </CardContent>
-        <CardFooter className="flex-col gap-2 sm:flex-row">
-          <Button
-            className={cn("w-full grow cursor-pointer sm:w-auto", {
-              "text-primary hover:text-primary": campaign.likes?.some(
-                (like) => like.uid === user?.uid && like.type === "like", // Check if the user has liked the campaign
-              ),
-            })}
-            variant="ghost"
-            onClick={() => void handleOnLikeCampaign(campaign.id)}
-            disabled={isLoading}
-          >
-            <ThumbsUpIcon /> Like
-          </Button>
-          <Button
-            className="w-full grow cursor-pointer sm:w-auto"
-            variant="ghost"
-            onClick={() => setIsCommentDialogOpen(true)}
-          >
-            <MessageCircleIcon /> Comment
-          </Button>
 
-          <Button
-            className="w-full grow cursor-pointer sm:w-auto"
-            variant="ghost"
-            onClick={() => void handleOnShareCampaign(campaign.id)}
-          >
-            <Share2Icon /> Share
-          </Button>
+          <Separator />
+
+          {campaign.status === "pending" && (
+            <Form {...form}>
+              <h4 className="my-4 text-lg font-semibold">Points</h4>
+
+              <AcceptCampaignDialog
+                open={isAcceptDialogOpen}
+                onOpenChange={setIsAcceptDialogOpen}
+                campaign={campaign}
+              />
+
+              <RejectCampaignDialog
+                open={isRejectDialogOpen}
+                onOpenChange={setIsRejectDialogOpen}
+                campaign={campaign}
+              />
+
+              <form className="grid gap-4 sm:grid-cols-2">
+                <FormField
+                  control={form.control}
+                  name="points.like"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Like</FormLabel>
+                      <FormControl>
+                        <Input type="number" min={0} {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="points.comment"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Comment</FormLabel>
+                      <FormControl>
+                        <Input type="number" min={0} {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="points.share"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Share</FormLabel>
+                      <FormControl>
+                        <Input type="number" min={0} {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="points.campaignManager"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Campaign Manager</FormLabel>
+                      <FormControl>
+                        <Input type="number" min={0} {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </form>
+            </Form>
+          )}
+        </CardContent>
+        <CardFooter className="flex-col gap-2">
+          {campaign.status === "pending" ? (
+            <>
+              <Button
+                className="w-full grow cursor-pointer"
+                onClick={() => setIsAcceptDialogOpen(true)}
+              >
+                Accept
+              </Button>
+              <Button
+                className="w-full grow cursor-pointer"
+                variant="destructive"
+                onClick={() => setIsRejectDialogOpen(true)}
+              >
+                Reject
+              </Button>
+            </>
+          ) : (
+            <Button
+              className="w-full grow cursor-pointer"
+              variant="ghost"
+              onClick={() => setIsCommentDialogOpen(true)}
+            >
+              <MessageCircleIcon /> Comment
+            </Button>
+          )}
         </CardFooter>
       </Card>
       {comments.length >= 1
@@ -989,14 +798,12 @@ function CampaignList({ campaign, participations, user }: CampaignListProps) {
                 <div>
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <Link href={`/profile/${comment.uid}`}>
-                        <Avatar>
-                          <AvatarImage src={comment.userPhotoURL ?? ""} />
-                          <AvatarFallback>
-                            {comment.displayName.slice(0, 2)}
-                          </AvatarFallback>
-                        </Avatar>
-                      </Link>
+                      <Avatar>
+                        <AvatarImage src={comment.userPhotoURL ?? ""} />
+                        <AvatarFallback>
+                          {comment.displayName.slice(0, 2)}
+                        </AvatarFallback>
+                      </Avatar>
                       <div className="flex items-center gap-1">
                         <p className="text-xs font-bold">
                           {comment.displayName}
@@ -1060,7 +867,7 @@ function CampaignLightBoxDialog({
     api.on("select", () => {
       setCurrent(api.selectedScrollSnap() + 1);
     });
-  }, [api, activeIndex]);
+  }, [api]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -1126,14 +933,12 @@ function CampaignLightBoxDialog({
 
 interface CommentsDialogProps {
   open: boolean;
-  user: User;
   onOpenChange: React.Dispatch<React.SetStateAction<boolean>>;
   campaignId: string;
 }
 
 function CommentsDialog({
   open,
-  user,
   onOpenChange,
   campaignId,
 }: CommentsDialogProps) {
@@ -1144,21 +949,17 @@ function CommentsDialog({
   const [frameTier, setFrameTier] = React.useState<FrameTier>("bronze");
   const [isRankDialogOpen, setIsRankDialogOpen] = React.useState(false);
   const [type, setType] = React.useState<"promote" | "demote">("promote");
+
   const handleOnSendComment = async () => {
     setIsSending(true);
+    const user = auth.currentUser;
     const pointsRef = collection(
       db,
       "campaigns",
       campaignId,
       "points",
     ).withConverter(pointsConverter);
-    const campaignOptions = (
-      await getDocs(pointsRef)
-    ).docs[0]!.data() as Points;
-
-    const frameTier = await getDoc(
-      doc(db, "users", user?.uid ?? "").withConverter(userConverter),
-    ).then((doc) => doc.data()!.frameTier);
+    const campaignPoints = (await getDocs(pointsRef)).docs[0]!.data() as Points;
 
     if (user) {
       try {
@@ -1170,25 +971,19 @@ function CommentsDialog({
           timestamp: serverTimestamp(),
           uid: user.uid,
           campaignRef: campaignRef,
-          userPhotoURL: user.profilepictureURL,
-          frameTier,
         };
 
         // Add the comment to the 'comments' collection
         await addDoc(collection(db, "comments"), commentData);
 
-        // Award points based on campaign comment points
+        // Award 5 points
         const userRef = doc(db, "users", user.uid);
-        await updateDoc(userRef, {
-          points: increment(campaignOptions.comment),
-        });
+        await updateDoc(userRef, { points: increment(campaignPoints.comment) });
         await updateFrameTier(userRef);
         setType("promote");
 
-        await addScoreLog("comment", campaignOptions.comment, user, campaignId);
-
         toast.success(
-          `Comment added successfully and earned ${campaignOptions.comment} points!`,
+          `Comment added successfully and earned ${campaignPoints.comment} points!`,
         );
         setIsSending(false);
         setComment("");
@@ -1203,27 +998,26 @@ function CommentsDialog({
     }
   };
 
+  const onHandleDeleteComment = async (commentId: string) => {
+    const commentRef = doc(db, "comments", commentId);
+    await deleteDoc(commentRef)
+      .finally(() => {
+        toast.success("Comment deleted successfully!");
+      })
+      .catch(() => {
+        toast.error("Error deleting comment. Please try again.");
+      });
+  };
+
   // Helper function to update frame tier
   async function updateFrameTier(userRef: DocumentReference) {
     const userSnap = await getDoc(userRef);
-    const [silver, gold, platinum, diamond]: Awaited<number[]> =
-      (await Promise.all([
-        (await getDoc(doc(db, "rankDescription", "silver")))?.data()
-          ?.points as Awaited<number>,
-        (await getDoc(doc(db, "rankDescription", "gold")))?.data()
-          ?.points as Awaited<number>,
-        (await getDoc(doc(db, "rankDescription", "platinum")))?.data()
-          ?.points as Awaited<number>,
-        (await getDoc(doc(db, "rankDescription", "diamond")))?.data()
-          ?.points as Awaited<number>,
-      ])) as number[];
-
     if (userSnap.exists()) {
       const points = userSnap.data().points || 0;
       const currentTier = userSnap.data().frameTier as FrameTier;
 
-      let tier: FrameTier;
-      if (points >= (diamond as number)) {
+      let tier;
+      if (points >= 5001) {
         tier = "diamond";
 
         if (currentTier !== "diamond") {
@@ -1232,21 +1026,21 @@ function CommentsDialog({
             : setFrameTier("platinum");
           setIsRankDialogOpen(true);
         }
-      } else if (points >= (platinum as number)) {
+      } else if (points >= 3501) {
         tier = "platinum";
 
         if (currentTier !== "platinum") {
           type === "promote" ? setFrameTier("platinum") : setFrameTier("gold");
           setIsRankDialogOpen(true);
         }
-      } else if (points >= (gold as number)) {
+      } else if (points >= 1501) {
         tier = "gold";
 
         if (currentTier !== "gold") {
           type === "promote" ? setFrameTier("gold") : setFrameTier("silver");
           setIsRankDialogOpen(true);
         }
-      } else if (points >= (silver as number)) {
+      } else if (points >= 501) {
         tier = "silver";
 
         if (currentTier !== "silver") {
@@ -1256,7 +1050,7 @@ function CommentsDialog({
       } else {
         tier = "bronze";
 
-        if (currentTier !== "bronze") {
+        if (currentTier !== "bronze" && type === "demote") {
           setFrameTier("bronze");
           setIsRankDialogOpen(true);
         }
@@ -1292,7 +1086,7 @@ function CommentsDialog({
     });
 
     return () => unsub();
-  }, [campaignId]);
+  }, []);
 
   if (isFetching) return null;
 
@@ -1307,44 +1101,52 @@ function CommentsDialog({
           <div className="space-y-2">
             {comments.length >= 1 ? (
               comments.map((comment) => (
-                <Card key={comment.id} className="w-full p-0">
-                  <CardContent className="p-2">
-                    <div>
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <Link href={`/profile/${comment.uid}`}>
+                <div key={comment.id} className="flex items-center gap-2">
+                  <Card className="w-full p-0">
+                    <CardContent className="p-2">
+                      <div>
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
                             <Avatar>
                               <AvatarImage src={comment.userPhotoURL ?? ""} />
                               <AvatarFallback>
                                 {comment.displayName.slice(0, 2)}
                               </AvatarFallback>
                             </Avatar>
-                          </Link>
-                          <div className="flex items-center gap-1">
-                            <p className="text-xs font-bold">
-                              {comment.displayName}
-                            </p>
-                            <img
-                              className="size-4"
-                              src={getFrame(comment.frameTier)}
-                              alt={comment.displayName}
-                            />
+                            <div className="flex items-center gap-1">
+                              <p className="text-xs font-bold">
+                                {comment.displayName}
+                              </p>
+                              <img
+                                className="size-4"
+                                src={getFrame(comment.frameTier)}
+                                alt={comment.displayName}
+                              />
+                            </div>
                           </div>
+                          <p className="text-primary text-xs font-semibold">
+                            {intlFormatDistance(
+                              comment.timestamp?.toDate() ?? new Date(),
+                              new Date(),
+                              { style: "narrow" },
+                            )}
+                          </p>
                         </div>
-                        <p className="text-primary text-xs font-semibold">
-                          {intlFormatDistance(
-                            comment.timestamp?.toDate() ?? new Date(),
-                            new Date(),
-                            { style: "narrow" },
-                          )}
+                        <p className="text-muted-foreground text-xs">
+                          {comment.comment}
                         </p>
                       </div>
-                      <p className="text-muted-foreground text-xs">
-                        {comment.comment}
-                      </p>
-                    </div>
-                  </CardContent>
-                </Card>
+                    </CardContent>
+                  </Card>
+
+                  <Button
+                    size="icon"
+                    variant="destructive"
+                    onClick={() => onHandleDeleteComment(comment.id)}
+                  >
+                    <TrashIcon />
+                  </Button>
+                </div>
               ))
             ) : (
               <div className="flex min-h-full items-center justify-center">
@@ -1376,7 +1178,6 @@ function CommentsDialog({
           frameTier={frameTier}
           open={isRankDialogOpen}
           onOpenChange={setIsRankDialogOpen}
-          type={type}
         />
       </DialogContent>
     </Dialog>
@@ -1387,14 +1188,12 @@ interface RankBadgeDialogProps {
   open: boolean;
   onOpenChange: React.Dispatch<React.SetStateAction<boolean>>;
   frameTier: FrameTier;
-  type: "promote" | "demote";
 }
 
 function RankBadgeDialog({
   open = true,
   onOpenChange,
   frameTier,
-  type,
 }: RankBadgeDialogProps) {
   function getFrame() {
     switch (frameTier) {
@@ -1432,16 +1231,12 @@ function RankBadgeDialog({
               />
             </AspectRatio>
           </div>
-          {type === "promote"
-            ? "You have been promoted to the"
-            : "You have been demoted to the"}
+          You have been promoted to the{" "}
           <span className="font-bold">
             {frameTier.charAt(0).toUpperCase() + frameTier.slice(1)}
           </span>{" "}
-          tier!{" "}
-          {type === "promote"
-            ? "Keep up the great work and continue participating to earn more points and rewards."
-            : "You can try to earn back your previous rank by participating in more campaigns."}
+          tier! Keep up the great work and continue participating to earn more
+          points and rewards.
         </div>
         <DialogFooter>
           <DialogClose asChild>

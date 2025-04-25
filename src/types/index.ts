@@ -26,7 +26,6 @@ export type Points = {
   like: number;
   comment: number;
   share: number;
-  join: number;
 };
 
 export type Like = {
@@ -115,4 +114,12 @@ export type ScoreHistoryLog = {
   type: InteractionType;
   createdAt: Timestamp;
   campaignid: string;
+};
+
+export type RankDescription = {
+  id: string;
+  name: string;
+  points: number;
+  image: string;
+  createdAt: Timestamp;
 };

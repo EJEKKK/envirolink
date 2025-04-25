@@ -100,12 +100,7 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
+import { TooltipProvider } from "@/components/ui/tooltip";
 import { auth, db, storage } from "@/config/firebase";
 import { addScoreLog, getFrame } from "@/helper";
 import useCreateCampaignStore from "@/hooks/use-create-campaign-store";
@@ -128,9 +123,9 @@ import type {
   Points,
   User,
 } from "@/types";
+import JoinedVolunteerList from "./_components/joined-volunteer-list";
 import VolunteerAttendanceDialog from "./_components/volunteer-attendance-dialog";
 
-import Image from "next/image";
 import type { DateRange } from "react-day-picker";
 import { useShallow } from "zustand/shallow";
 
@@ -794,6 +789,8 @@ function CampaignList({ campaign, participations, user }: CampaignListProps) {
   const [type, setType] = React.useState<"promote" | "demote">("promote");
   const [comments, setComments] = React.useState<Comment[]>([]);
   const [shareCount, setShareCount] = React.useState(0);
+  const [isVolunteerDialogOpened, setIsSetVolunteerDialogOpened] =
+    React.useState(false);
 
   function handleOnImageClick(index: number) {
     setIsLightBoxOpen(true);
@@ -1210,100 +1207,18 @@ function CampaignList({ campaign, participations, user }: CampaignListProps) {
                 </p>
               </div>
 
-              <div className="flex items-center">
-                {participations
-                  .slice(0, 3)
-                  .filter(
-                    (participation) => participation.campaignid === campaign.id,
-                  )
-                  .map((participation, index) => (
-                    <Tooltip key={participation.id}>
-                      <TooltipTrigger asChild>
-                        <Avatar
-                          className={cn("border-2", index >= 1 && "-ml-4")}
-                        >
-                          <AvatarImage
-                            src={participation.profilepictureURL}
-                            alt={participation.displayName}
-                          />
-                          <AvatarFallback>
-                            {participation.displayName.charAt(0).toUpperCase()}
-                          </AvatarFallback>
-                        </Avatar>
-                      </TooltipTrigger>
-                      <TooltipContent className="flex items-center gap-2">
-                        <Avatar className="border-2">
-                          <AvatarImage
-                            src={participation.profilepictureURL}
-                            alt={participation.displayName}
-                          />
-                          <AvatarFallback>
-                            {participation.displayName.charAt(0).toUpperCase()}
-                          </AvatarFallback>
-                        </Avatar>
-                        {participation.displayName}
-                        <Image
-                          src={getFrame(participation.frameTier)}
-                          alt={participation.displayName}
-                          priority
-                          height={20}
-                          width={20}
-                        />
-                      </TooltipContent>
-                    </Tooltip>
-                  ))}
-                {participations.filter(
-                  (campaign) => campaign.campaignid === campaign.id,
-                ).length > 3 ? (
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Avatar className="-ml-4">
-                        <AvatarFallback>
-                          {participations.filter(
-                            (campaign) => campaign.campaignid === campaign.id,
-                          ).length - 3}
-                          +
-                        </AvatarFallback>
-                      </Avatar>
-                    </TooltipTrigger>
-                    <TooltipContent className="flex flex-col items-center gap-2">
-                      <ScrollArea className="h-full max-h-80">
-                        {participations
-                          .slice(2)
-                          .filter(
-                            (campaign) => campaign.campaignid === campaign.id,
-                          )
-                          .map((participation) => (
-                            <div
-                              key={participation.id}
-                              className="flex items-center gap-2"
-                            >
-                              <Avatar className="border-2">
-                                <AvatarImage
-                                  src={participation.profilepictureURL}
-                                  alt={participation.displayName}
-                                />
-                                <AvatarFallback>
-                                  {participation.displayName
-                                    .charAt(0)
-                                    .toUpperCase()}
-                                </AvatarFallback>
-                              </Avatar>
-                              {participation.displayName}
-                              <Image
-                                src={getFrame(participation.frameTier)}
-                                alt={participation.displayName}
-                                priority
-                                height={20}
-                                width={20}
-                              />
-                            </div>
-                          ))}
-                      </ScrollArea>
-                    </TooltipContent>
-                  </Tooltip>
-                ) : null}
-              </div>
+              <Button onClick={() => setIsSetVolunteerDialogOpened(true)}>
+                View joined volunteers
+              </Button>
+              <JoinedVolunteerList
+                open={isVolunteerDialogOpened}
+                onOpenChange={setIsSetVolunteerDialogOpened}
+                participations={participations.filter(
+                  (participation) => participation.campaignid === campaign.id,
+                )}
+                user={user}
+                campaign={campaign}
+              />
             </CardDescription>
             <Separator />
             <div className="grid gap-4 text-sm md:grid-cols-2">
@@ -1318,13 +1233,6 @@ function CampaignList({ campaign, participations, user }: CampaignListProps) {
                 <p>Comment</p>
                 <p className="text-primary font-semibold">
                   {campaign.points?.comment} pts
-                </p>
-              </div>
-
-              <div>
-                <p>Join</p>
-                <p className="text-primary font-semibold">
-                  {campaign.points?.join} pts
                 </p>
               </div>
 

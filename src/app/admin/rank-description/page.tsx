@@ -1,174 +1,108 @@
 "use client";
+import Image from "next/image";
 import * as React from "react";
 
 import { Button } from "@/components/ui/button";
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@/components/ui/form";
-import { Input } from "@/components/ui/input";
+import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { db } from "@/config/firebase";
-import {
-  type RankDescriptionFormSchema,
-  rankDescriptionFormSchema,
-} from "./_lib/validations";
+import { useIsClient } from "@/hooks/use-is-client";
+import { formatCompactNumber, rankDescriptionConverter } from "@/lib/utils";
+import type { RankDescription } from "@/types";
+import CreateRankDialog from "./_components/create-rank-dialog-form";
+import EditRankDialog from "./_components/edit-rank-dialog-form";
 
-import { zodResolver } from "@hookform/resolvers/zod";
-import { doc, setDoc } from "firebase/firestore";
-import { useForm } from "react-hook-form";
-import { toast } from "sonner";
-import { Loader2Icon } from "lucide-react";
+import { collection, onSnapshot, orderBy, query } from "firebase/firestore";
+import { Loader2Icon, PlusCircleIcon, Trash2Icon } from "lucide-react";
+import DeleteRankDialog from "./_components/delete-rank-dialog";
 
-export default function RankDescription() {
-  const form = useForm<RankDescriptionFormSchema>({
-    resolver: zodResolver(rankDescriptionFormSchema),
-    defaultValues: {
-      silver: 0,
-      gold: 0,
-      platinum: 0,
-      diamond: 0,
-    },
-  });
-  const [isPending, setIsPending] = React.useState(false);
+export default function RankDescriptionPage() {
+  const [ranks, setRanks] = React.useState<RankDescription[]>([]);
+  const [isFetching, setIsFetching] = React.useState(false);
+  const isClient = useIsClient();
 
-  const handleOnSetRankDescription = async (
-    values: RankDescriptionFormSchema,
-  ) => {
-    setIsPending(true);
-    await Promise.all([
-      await setDoc(doc(db, "rankDescription", "silver"), {
-        points: values.silver,
-      }),
-      await setDoc(doc(db, "rankDescription", "gold"), {
-        points: values.gold,
-      }),
-      await setDoc(doc(db, "rankDescription", "platinum"), {
-        points: values.platinum,
-      }),
-      await setDoc(doc(db, "rankDescription", "diamond"), {
-        points: values.diamond,
-      }),
-    ])
-      .catch((err) => {
-        toast.error("Failed to update rank description!", {
-          richColors: true,
-          description: err.message,
-        });
-        setIsPending(false);
-      })
-      .finally(() => {
-        toast.success("Rank description updated successfully!");
-        setIsPending(false);
-      });
-  };
+  React.useEffect(() => {
+    setIsFetching(true);
+    const ranksRef = collection(db, "rankDescription").withConverter(
+      rankDescriptionConverter,
+    );
+    const q = query(
+      ranksRef,
+      orderBy("createdAt", "desc"),
+      orderBy("points", "desc"),
+    );
+
+    const unsubRanks = onSnapshot(q, (snapshot) => {
+      const ranksData: RankDescription[] = [];
+
+      for (const doc of snapshot.docs) {
+        ranksData.push({ ...doc.data(), id: doc.id });
+      }
+
+      setRanks(ranksData);
+      setIsFetching(false);
+    });
+
+    return () => {
+      unsubRanks();
+    };
+  }, []);
+
+  if (!isClient) return null;
 
   return (
     <>
-      <header className="flex h-16 shrink-0 items-center gap-2 transition-[width,height] ease-linear group-has-[[data-collapsible=icon]]/sidebar-wrapper:h-12">
-        <div className="flex items-center gap-2 px-4">
+      <header className="flex h-16 shrink-0 items-center justify-between gap-2 px-4 transition-[width,height] ease-linear group-has-[[data-collapsible=icon]]/sidebar-wrapper:h-12">
+        <div className="flex items-center gap-2">
           <SidebarTrigger className="-ml-1" />
           <h4 className="text-lg font-semibold">Rank Description</h4>
         </div>
+
+        <CreateRankDialog />
       </header>
       <main className="mt-4 p-4">
-        <Form {...form}>
-          <form
-            className="grid gap-4 md:grid-cols-2"
-            onSubmit={form.handleSubmit(handleOnSetRankDescription)}
-          >
-            <FormField
-              control={form.control}
-              name="silver"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Silver Points</FormLabel>
-                  <FormControl>
-                    <Input
-                      type="number"
-                      min={0}
-                      {...field}
-                      placeholder="Enter your points"
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="gold"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Gold Points</FormLabel>
-                  <FormControl>
-                    <Input
-                      type="number"
-                      min={0}
-                      {...field}
-                      placeholder="Enter your points"
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="platinum"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Platinun Points</FormLabel>
-                  <FormControl>
-                    <Input
-                      type="number"
-                      min={0}
-                      {...field}
-                      placeholder="Enter your points"
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="diamond"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Diamond Points</FormLabel>
-                  <FormControl>
-                    <Input
-                      type="number"
-                      min={0}
-                      {...field}
-                      placeholder="Enter your points"
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <div className="flex justify-end md:col-span-2">
-              <Button
-                type="submit"
-                className="w-full md:w-fit"
-                disabled={isPending}
-              >
-                {isPending && <Loader2Icon className="animate-spin" />} Save
-                changes
-              </Button>
+        <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3">
+          {!isFetching ? (
+            ranks.length >= 1 ? (
+              ranks.map((rank) => (
+                <Card key={rank.id}>
+                  <CardContent className="flex flex-col items-center gap-4">
+                    <img className="w-20" src={rank.image} alt={rank.name} />
+                    <div className="text-center">
+                      <p>{rank.name}</p>
+                      <p className="text-primary">
+                        {formatCompactNumber(rank.points)} points
+                      </p>
+                    </div>
+                  </CardContent>
+                  <CardFooter className="flex w-full flex-col gap-2">
+                    <EditRankDialog rank={rank} />
+                    <DeleteRankDialog rankId={rank.id} />
+                  </CardFooter>
+                </Card>
+              ))
+            ) : (
+              <div className="text-muted-foreground flex flex-col items-center justify-center gap-4 rounded-md border border-dashed p-4 sm:col-span-2 md:col-span-3">
+                <Image
+                  className="w-40"
+                  src="/illustrations/create-empty-state.svg"
+                  alt="create rank"
+                  priority
+                  height={40}
+                  width={40}
+                />
+                <h4 className="text-lg font-semibold">
+                  No ranks have been created yet
+                </h4>
+                <CreateRankDialog />
+              </div>
+            )
+          ) : (
+            <div className="flex items-center justify-center p-4 sm:col-span-2 md:col-span-3">
+              <Loader2Icon className="text-primary animate-spin" />
             </div>
-          </form>
-        </Form>
+          )}
+        </div>
       </main>
     </>
   );

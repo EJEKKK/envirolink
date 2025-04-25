@@ -373,8 +373,7 @@ export default function HomePage() {
                   .filter(
                     (campaign) =>
                       !campaign.isDone &&
-                      new Date() <=
-                        sub(campaign.description.when.toDate(), { days: 3 }),
+                      new Date() <= campaign.description.when.toDate(),
                   )
                   .map((campaign) => (
                     <CampaignList key={campaign.id} campaign={campaign} />

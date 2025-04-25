@@ -5,7 +5,6 @@ export const pointFormSchema = z.object({
     like: z.coerce.number(),
     comment: z.coerce.number(),
     share: z.coerce.number(),
-    join: z.coerce.number(),
     campaignManager: z.coerce.number(),
   }),
 });
