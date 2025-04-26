@@ -935,7 +935,7 @@ function CampaignList({ campaign, participations, user }: CampaignListProps) {
         await addScoreLog("share", campaignOptions.share, user, campaignId);
 
         // Open the Facebook share dialog
-        const url = `https://envirolink.vercel.app/campaign/${campaignId}`;
+        const url = `https://envirolink-seven.vercel.app/campaign/${campaignId}`;
         const shareUrl = `https://www.facebook.com/sharer/sharer.php?u=${url}?e=${encodeURIComponent(
           campaignData?.title ?? "",
         )}`;
