@@ -12,15 +12,17 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Skeleton } from "@/components/ui/skeleton";
-import { auth } from "@/config/firebase";
+import { auth, db } from "@/config/firebase";
 import useCreateCampaignStore from "@/hooks/use-create-campaign-store";
-import { cn, formatCompactNumber } from "@/lib/utils";
-import type { User } from "@/types";
+import { cn, formatCompactNumber, rankDescriptionConverter } from "@/lib/utils";
+import type { RankDescription, User } from "@/types";
 import { Avatar, AvatarFallback, AvatarImage } from "../ui/avatar";
 import { Button } from "../ui/button";
 import RankDescriptionDialog from "./rank-description";
 
+import { useScoreLogStore } from "@/hooks/use-score-log-store";
 import { signOut } from "firebase/auth";
+import { collection, onSnapshot, orderBy, query } from "firebase/firestore";
 import {
   BadgeInfo,
   ChevronDown,
@@ -29,8 +31,6 @@ import {
   PlusCircle,
   User2Icon,
 } from "lucide-react";
-import { useScoreLogStore } from "@/hooks/use-score-log-store";
-import { getFrame } from "@/helper";
 
 interface NavbarProps {
   user: User;
@@ -42,6 +42,32 @@ export default function Navbar({ user }: NavbarProps) {
     (state) => state.setOpen,
   );
   const [open, setOpen] = React.useState(false);
+  const [rankImage, setRankImage] = React.useState("");
+
+  React.useEffect(() => {
+    const rankRef = collection(db, "rankDescription").withConverter(
+      rankDescriptionConverter,
+    );
+    const q = query(rankRef, orderBy("createdAt", "asc"));
+
+    const unsubRank = onSnapshot(q, (snapshot) => {
+      const ranks: RankDescription[] = [];
+
+      for (const doc of snapshot.docs) {
+        ranks.push({ ...doc.data(), id: doc.id });
+      }
+
+      if (ranks.length >= 1) {
+        for (const rank of ranks) {
+          if (user.points >= rank.points) {
+            setRankImage(rank.image);
+          }
+        }
+      }
+    });
+
+    return () => unsubRank();
+  }, [user]);
 
   return (
     <nav className="bg-background sticky top-0 z-50 flex w-full shrink-0 items-stretch justify-center shadow">
@@ -79,12 +105,13 @@ export default function Navbar({ user }: NavbarProps) {
                     <Skeleton className="size-full" />
                   </AvatarFallback>
                 </Avatar>
-                <Image
-                  src={getFrame(user.frameTier)}
-                  alt="frame tier"
-                  height={18}
-                  width={18}
-                />
+                {rankImage.length >= 1 && (
+                  <img
+                    className="size-4"
+                    src={rankImage ?? ""}
+                    alt="frame tier"
+                  />
+                )}
                 <p className="text-xs">{formatCompactNumber(user.points)}pts</p>
                 <ChevronDown className="size-4" />
               </Button>

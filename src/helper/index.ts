@@ -1,29 +1,21 @@
 import { db } from "@/config/firebase";
-import type { FrameTier, InteractionType, User } from "@/types";
+import { rankDescriptionConverter } from "@/lib/utils";
+import type {
+  FrameTier,
+  InteractionType,
+  RankDescription,
+  User,
+} from "@/types";
 
-import { addDoc, collection, serverTimestamp } from "firebase/firestore";
-
-/**
- * Returns the badge image path based on the user's frame tier
- * @param frameTier - The user's frame tier level (bronze, silver, gold, platinum, or diamond)
- * @returns The path to the corresponding badge image
- */
-export function getFrame(frameTier: FrameTier) {
-  switch (frameTier) {
-    case "bronze":
-      return "/badges/BRONZE.png";
-    case "silver":
-      return "/badges/SILVER.png";
-    case "gold":
-      return "/badges/GOLD.png";
-    case "platinum":
-      return "/badges/PLATINUM.png";
-    case "diamond":
-      return "/badges/DIAMOND.png";
-    default:
-      return "/badges/BRONZE.png";
-  }
-}
+import {
+  addDoc,
+  collection,
+  getDocs,
+  onSnapshot,
+  orderBy,
+  query,
+  serverTimestamp,
+} from "firebase/firestore";
 
 export async function addScoreLog(
   type: InteractionType,
@@ -32,6 +24,22 @@ export async function addScoreLog(
   campaignId: string,
 ) {
   const scoreLogRef = collection(db, "scoreLog");
+  const rankRef = collection(db, "rankDescription").withConverter(
+    rankDescriptionConverter,
+  );
+  const q = query(rankRef, orderBy("createdAt", "desc"));
+  const ranks = (await getDocs(q)).docs.map((doc) => ({
+    ...doc.data(),
+    id: doc.id,
+  }));
+
+  let rankImage = "";
+  for (const rank of ranks) {
+    if (user.points >= rank.points) {
+      rankImage += rank.image;
+      break;
+    }
+  }
 
   await addDoc(scoreLogRef, {
     displayName: user.displayName,
@@ -39,6 +47,7 @@ export async function addScoreLog(
     uid: user.uid,
     profilepictureURL: user.profilepictureURL,
     frameTier: user.frameTier,
+    rankImage,
     score,
     type,
     createdAt: serverTimestamp(),

@@ -87,7 +87,6 @@ import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { auth, db } from "@/config/firebase";
-import { getFrame } from "@/helper";
 import {
   campaignConverter,
   cn,
@@ -107,11 +106,11 @@ import type {
   User,
 } from "@/types";
 import { type PointFormSchema, pointFormSchema } from "../_lib/validations";
+import AcceptCampaignDialog from "./_components/accept-campaign-dialog";
 import DeleteCampaignDialog from "./_components/delete-campaign-dialog";
 import EditCampaignDialog from "./_components/edit-campaign-dialog";
-import VolunteerAttendanceDialog from "./_components/volunteer-attendance-dialog";
-import AcceptCampaignDialog from "./_components/accept-campaign-dialog";
 import RejectCampaignDialog from "./_components/reject-campaign-dialog";
+import VolunteerAttendanceDialog from "./_components/volunteer-attendance-dialog";
 
 const CATEGORY_OPTIONS: Array<{
   label: string;
@@ -808,11 +807,13 @@ function CampaignList({ campaign, participations }: CampaignListProps) {
                         <p className="text-xs font-bold">
                           {comment.displayName}
                         </p>
-                        <img
-                          className="size-4"
-                          src={getFrame(comment.frameTier)}
-                          alt={comment.displayName}
-                        />
+                        {comment.rankImage.length > 0 && (
+                          <img
+                            className="size-4"
+                            src={comment.rankImage}
+                            alt={comment.displayName}
+                          />
+                        )}
                       </div>
                     </div>
                     <p className="text-primary text-xs font-semibold">
@@ -1117,11 +1118,13 @@ function CommentsDialog({
                               <p className="text-xs font-bold">
                                 {comment.displayName}
                               </p>
-                              <img
-                                className="size-4"
-                                src={getFrame(comment.frameTier)}
-                                alt={comment.displayName}
-                              />
+                              {comment.rankImage.length > 0 && (
+                                <img
+                                  className="size-4"
+                                  src={comment.rankImage}
+                                  alt={comment.displayName}
+                                />
+                              )}
                             </div>
                           </div>
                           <p className="text-primary text-xs font-semibold">

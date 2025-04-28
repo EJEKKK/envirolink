@@ -1,5 +1,4 @@
 "use client";
-import Image from "next/image";
 import * as React from "react";
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -18,7 +17,6 @@ import {
 import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { db } from "@/config/firebase";
-import { getFrame } from "@/helper";
 import { participationConverter } from "@/lib/utils";
 import type { Campaign, Participation } from "@/types";
 
@@ -131,13 +129,10 @@ export default function VolunteerAttendanceDialog({
                       htmlFor={participation.id}
                     >
                       <p>{participation.displayName}</p>
-                      <Image
+                      <img
                         className="inline-block size-4"
-                        src={getFrame(participation.frameTier)}
+                        src={participation.frameTier}
                         alt="frame"
-                        priority
-                        height={20}
-                        width={20}
                       />
                     </Label>
 

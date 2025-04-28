@@ -32,7 +32,6 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { db } from "@/config/firebase";
-import { getFrame } from "@/helper";
 import { useIsClient } from "@/hooks/use-is-client";
 import {
   cn,
@@ -248,7 +247,7 @@ export default function CampaignSection({ campaign }: CampaignSectionProps) {
                         </p>
                         <img
                           className="size-4"
-                          src={getFrame(comment.frameTier)}
+                          src={comment.rankImage}
                           alt={comment.displayName}
                         />
                       </div>
@@ -442,7 +441,7 @@ function CommentsDialog({
                             </p>
                             <img
                               className="size-4"
-                              src={getFrame(comment.frameTier)}
+                              src={comment.rankImage}
                               alt={comment.displayName}
                             />
                           </div>

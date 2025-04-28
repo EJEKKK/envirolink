@@ -1,9 +1,7 @@
 "use client";
-import Image from "next/image";
 import * as React from "react";
 
 import { db } from "@/config/firebase";
-import { getFrame } from "@/helper";
 import { useIsClient } from "@/hooks/use-is-client";
 import { useScoreLogStore } from "@/hooks/use-score-log-store";
 import { scoreHistoryLogConverter } from "@/lib/utils";
@@ -31,9 +29,9 @@ import {
   query,
   where,
 } from "firebase/firestore";
-import { useShallow } from "zustand/shallow";
 import { Loader2Icon } from "lucide-react";
 import Link from "next/link";
+import { useShallow } from "zustand/shallow";
 
 interface ScoringLogDialogProps {
   user: User;
@@ -109,12 +107,13 @@ export default function ScoringLogDialog({ user }: ScoringLogDialogProps) {
                       <div className="grow">
                         <div className="flex items-center gap-1">
                           <p>{log.displayName}</p>
-                          <Image
-                            src={getFrame(log.frameTier)}
-                            alt="Frame Tier"
-                            width={20}
-                            height={20}
-                          />
+                          {log.rankImage.length > 0 && (
+                            <img
+                              className="size-5"
+                              src={log.rankImage}
+                              alt="Frame Tier"
+                            />
+                          )}
                         </div>
                         <p className="text-muted-foreground text-sm">
                           {log.email}

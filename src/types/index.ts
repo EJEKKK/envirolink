@@ -83,6 +83,7 @@ export type Comment = {
   displayName: string;
   email: string;
   frameTier: FrameTier;
+  rankImage: string;
   timestamp: Timestamp;
   uid: string;
   campaignRef: DocumentReference;
@@ -97,6 +98,7 @@ export type Participation = {
   status: "joined";
   isPresent: boolean;
   frameTier: FrameTier;
+  rankImage: string;
   profilepictureURL: string;
   uid: string;
 };
@@ -110,6 +112,7 @@ export type ScoreHistoryLog = {
   uid: string;
   profilepictureURL: string;
   frameTier: FrameTier;
+  rankImage: string;
   score: number;
   type: InteractionType;
   createdAt: Timestamp;

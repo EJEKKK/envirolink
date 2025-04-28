@@ -1,5 +1,4 @@
 "use client";
-import Image from "next/image";
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
@@ -9,7 +8,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { getFrame } from "@/helper";
 import type { Participation } from "@/types";
 
 import { format } from "date-fns";
@@ -54,17 +52,15 @@ export default function JoinedVolunteerList({
                   <div>
                     <div className="flex items-center gap-1">
                       <p className="text-sm">{participation.displayName}</p>
-                      <Image
-                        src={getFrame(participation.frameTier)}
+                      <img
+                        className="size-4"
+                        src={participation.rankImage ?? ""}
                         alt={participation.frameTier}
-                        priority
-                        height={18}
-                        width={18}
                       />
                     </div>
                     <p className="text-muted-foreground text-sm">
                       {format(
-                        participation.joindate.toDate(),
+                        participation?.joindate?.toDate() ?? new Date(),
                         "'Joined at' MMM dd, yyyy",
                       )}
                     </p>

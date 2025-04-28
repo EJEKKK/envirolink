@@ -34,7 +34,6 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { auth, db } from "@/config/firebase";
-import { getFrame } from "@/helper";
 import { useIsClient } from "@/hooks/use-is-client";
 import {
   cn,
@@ -43,8 +42,7 @@ import {
   participationConverter,
   userConverter,
 } from "@/lib/utils";
-import type { Comment, User } from "@/types";
-import type { ServerCampaign } from "@/types";
+import type { Comment, ServerCampaign, User } from "@/types";
 
 import { format, intlFormatDistance } from "date-fns";
 import {
@@ -283,11 +281,13 @@ export default function CampaignSection({ campaign }: CampaignSectionProps) {
                         <p className="text-xs font-bold">
                           {comment.displayName}
                         </p>
-                        <img
-                          className="size-4"
-                          src={getFrame(comment.frameTier)}
-                          alt={comment.displayName}
-                        />
+                        {comment.rankImage.length > 0 && (
+                          <img
+                            className="size-4"
+                            src={comment.rankImage}
+                            alt={comment.displayName}
+                          />
+                        )}
                       </div>
                     </div>
                     <p className="text-primary text-xs font-semibold">
@@ -479,7 +479,7 @@ function CommentsDialog({
                             </p>
                             <img
                               className="size-4"
-                              src={getFrame(comment.frameTier)}
+                              src={comment.rankImage}
                               alt={comment.displayName}
                             />
                           </div>

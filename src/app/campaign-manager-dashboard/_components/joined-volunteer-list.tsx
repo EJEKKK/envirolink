@@ -12,7 +12,6 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { db } from "@/config/firebase";
-import { getFrame } from "@/helper";
 import type { Campaign, Participation, User } from "@/types";
 
 import { format } from "date-fns";
@@ -76,7 +75,7 @@ export default function JoinedVolunteerList({
                     <div className="flex items-center gap-1">
                       <p className="text-sm">{participation.displayName}</p>
                       <Image
-                        src={getFrame(participation.frameTier)}
+                        src={participation.rankImage}
                         alt={participation.frameTier}
                         priority
                         height={18}

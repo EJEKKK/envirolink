@@ -1,5 +1,4 @@
 "use client";
-import Image from "next/image";
 import * as React from "react";
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -15,7 +14,7 @@ import {
 } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { db } from "@/config/firebase";
-import { addScoreLog, getFrame } from "@/helper";
+import { addScoreLog } from "@/helper";
 import type { Campaign, Participation, User } from "@/types";
 import { type ScoreFormSchema, scoreFormSchema } from "../_lib/validations";
 
@@ -139,13 +138,10 @@ export default function VolunteerAttendanceDialog({
                   <div className="text-xs">
                     <div className="flex items-center gap-1">
                       <p>{participation.displayName}</p>
-                      <Image
+                      <img
                         className="inline-block size-4"
-                        src={getFrame(participation.frameTier)}
+                        src={participation.rankImage}
                         alt="frame"
-                        priority
-                        height={20}
-                        width={20}
                       />
                     </div>
 

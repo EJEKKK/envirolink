@@ -7,6 +7,8 @@ import {
   deleteDoc,
   doc,
   onSnapshot,
+  orderBy,
+  query,
   updateDoc,
 } from "firebase/firestore";
 import { toast } from "sonner";
@@ -34,9 +36,8 @@ import {
 // import { type ChartConfig } from "@/components/ui/chart";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { auth, db } from "@/config/firebase";
-import { getFrame } from "@/helper";
-import { userConverter } from "@/lib/utils";
-import type { User } from "@/types";
+import { rankDescriptionConverter, userConverter } from "@/lib/utils";
+import type { RankDescription, User } from "@/types";
 
 // const chartConfig = {
 //   total: { color: "hsl(var(--primary))" },
@@ -44,6 +45,7 @@ import type { User } from "@/types";
 
 export default function Home() {
   const [users, setUsers] = React.useState<User[]>([]);
+  const [ranks, setRanks] = React.useState<RankDescription[]>([]);
   // const [totalFramesData, setTotalFramesData] = React.useState<
   //   { total: number; frame: FrameTier }[]
   // >([]);
@@ -67,7 +69,24 @@ export default function Home() {
       });
     });
 
-    return () => unsub();
+    const rankRef = collection(db, "rankDescription").withConverter(
+      rankDescriptionConverter,
+    );
+    const q = query(rankRef, orderBy("createdAt", "desc"));
+    const unsubRank = onSnapshot(q, (snapshot) => {
+      const ranks: RankDescription[] = [];
+
+      for (const doc of snapshot.docs) {
+        ranks.push({ ...doc.data(), id: doc.id });
+      }
+
+      setRanks(ranks);
+    });
+
+    return () => {
+      unsub();
+      unsubRank();
+    };
   }, []);
 
   // React.useEffect(() => {
@@ -157,11 +176,19 @@ export default function Home() {
                 <div>
                   <div className="flex items-center gap-2">
                     <CardTitle>{user.displayName}</CardTitle>
-                    <img
-                      className="size-6"
-                      src={getFrame(user.frameTier)}
-                      alt={user.displayName}
-                    />
+                    {ranks.length > 0 && (
+                      <img
+                        className="size-6"
+                        src={
+                          ranks.reduce(
+                            (acc: string | null, rank) =>
+                              rank.name === user.frameTier ? rank.image : acc,
+                            null,
+                          ) ?? "/badges/BRONZE.png"
+                        }
+                        alt={user.displayName}
+                      />
+                    )}
                   </div>
                   <div className="flex items-center gap-2">
                     <CardDescription>{user.email}</CardDescription>

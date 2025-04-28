@@ -12,6 +12,7 @@ import {
   getDocs,
   increment,
   onSnapshot,
+  orderBy,
   query,
   updateDoc,
   where,
@@ -53,9 +54,16 @@ import { useDebounce } from "@/hooks/use-debounce";
 import {
   campaignConverter,
   participationConverter,
+  rankDescriptionConverter,
   userConverter,
 } from "@/lib/utils";
-import type { Campaign, FrameTier, Participation, User } from "@/types";
+import type {
+  Campaign,
+  FrameTier,
+  Participation,
+  RankDescription,
+  User,
+} from "@/types";
 import EditProfileDialog from "./edit-profile-dialog";
 import VolunteerList from "./volunteer-list";
 
@@ -183,6 +191,7 @@ export default function ProfileSection({ userId }: ProfileSectionProps) {
     const participationQuery = query(
       participationRef,
       where("uid", "==", user.uid),
+      where("status", "==", "joined"),
     );
 
     const participationUnsub = onSnapshot(participationQuery, (snapshot) => {
@@ -401,41 +410,31 @@ interface FrameProps {
 }
 
 function Frame({ points }: FrameProps) {
-  const [rankPoints, setRankPoints] = React.useState<number[]>([]);
-  function applyFrame() {
-    if (points >= (rankPoints[3] as number)) return "DIAMOND.png";
-    if (points >= (rankPoints[2] as number)) return "PLATINUM.png";
-    if (points >= (rankPoints[1] as number)) return "GOLD.png";
-    if (points >= (rankPoints[0] as number)) return "SILVER.png";
-
-    return "BRONZE.png";
-  }
+  const [rank, setRank] = React.useState<RankDescription | null>(null);
 
   React.useEffect(() => {
-    async function fetchRankPoints() {
-      const rankPoints: Awaited<number[]> = (await Promise.all([
-        (await getDoc(doc(db, "rankDescription", "silver")))?.data()
-          ?.points as Awaited<number>,
-        (await getDoc(doc(db, "rankDescription", "gold")))?.data()
-          ?.points as Awaited<number>,
-        (await getDoc(doc(db, "rankDescription", "platinum")))?.data()
-          ?.points as Awaited<number>,
-        (await getDoc(doc(db, "rankDescription", "diamond")))?.data()
-          ?.points as Awaited<number>,
-      ])) as number[];
+    const rankRef = collection(db, "rankDescription").withConverter(
+      rankDescriptionConverter,
+    );
+    const q = query(rankRef, orderBy("createdAt", "asc"));
 
-      if (rankPoints.length > 0) {
-        setRankPoints(rankPoints);
+    const unsubRank = onSnapshot(q, (snapshot) => {
+      for (const doc of snapshot.docs) {
+        if (points >= doc.data().points) {
+          setRank({ ...doc.data(), id: doc.id });
+        }
       }
-    }
+    });
 
-    void fetchRankPoints();
-  }, []);
+    return () => unsubRank();
+  }, [points]);
+
+  if (!rank) return null;
 
   return (
     <div className="w-20">
       <AspectRatio className="w-20" ratio={1 / 1}>
-        <img src={`/badges/${applyFrame()}`} alt="frame" />
+        <img src={rank?.image ?? ""} alt="frame" />
       </AspectRatio>
     </div>
   );
@@ -448,7 +447,8 @@ interface CampaignListProps {
 }
 
 function CampaignList({ campaign, participations, user }: CampaignListProps) {
-  const [frameTier, setFrameTier] = React.useState<FrameTier>("bronze");
+  const [frameTier, setFrameTier] = React.useState("unknown");
+  const [rankImage, setRankImage] = React.useState("");
   const [isRankDialogOpen, setIsRankDialogOpen] = React.useState(false);
   const [isLeaving, setIsLeaving] = React.useState(false);
   const [type, setType] = React.useState<"promote" | "demote">("promote");
@@ -488,62 +488,32 @@ function CampaignList({ campaign, participations, user }: CampaignListProps) {
   // Helper function to update frame tier
   async function updateFrameTier(userRef: DocumentReference) {
     const userSnap = await getDoc(userRef);
-    const [silver, gold, platinum, diamond]: Awaited<number[]> =
-      (await Promise.all([
-        (await getDoc(doc(db, "rankDescription", "silver")))?.data()
-          ?.points as Awaited<number>,
-        (await getDoc(doc(db, "rankDescription", "gold")))?.data()
-          ?.points as Awaited<number>,
-        (await getDoc(doc(db, "rankDescription", "platinum")))?.data()
-          ?.points as Awaited<number>,
-        (await getDoc(doc(db, "rankDescription", "diamond")))?.data()
-          ?.points as Awaited<number>,
-      ])) as number[];
+    const rankRef = collection(db, "rankDescription").withConverter(
+      rankDescriptionConverter,
+    );
+    const q = query(rankRef, orderBy("createdAt", "desc"));
+    const ranks = await (
+      await getDocs(q)
+    ).docs.map((doc) => ({ ...doc.data(), id: doc.id }));
 
     if (userSnap.exists()) {
       const points = userSnap.data().points || 0;
-      const currentTier = userSnap.data().frameTier as FrameTier;
 
-      let tier: FrameTier;
-      if (points >= (diamond as number)) {
-        tier = "diamond";
+      for (const rank of ranks) {
+        if (points >= rank.points) {
+          if (userSnap.data().frameTier !== rank.name) {
+            await updateDoc(userRef, {
+              frameTier: rank.name,
+            }).then(() => {
+              setFrameTier(rank.name);
+              setRankImage(rank.image);
+              setIsRankDialogOpen(true);
+            });
+          }
 
-        if (currentTier !== "diamond") {
-          type === "promote"
-            ? setFrameTier("diamond")
-            : setFrameTier("platinum");
-          setIsRankDialogOpen(true);
-        }
-      } else if (points >= (platinum as number)) {
-        tier = "platinum";
-
-        if (currentTier !== "platinum") {
-          type === "promote" ? setFrameTier("platinum") : setFrameTier("gold");
-          setIsRankDialogOpen(true);
-        }
-      } else if (points >= (gold as number)) {
-        tier = "gold";
-
-        if (currentTier !== "gold") {
-          type === "promote" ? setFrameTier("gold") : setFrameTier("silver");
-          setIsRankDialogOpen(true);
-        }
-      } else if (points >= (silver as number)) {
-        tier = "silver";
-
-        if (currentTier !== "silver") {
-          type === "promote" ? setFrameTier("silver") : setFrameTier("bronze");
-          setIsRankDialogOpen(true);
-        }
-      } else {
-        tier = "bronze";
-
-        if (currentTier !== "bronze") {
-          setFrameTier("bronze");
-          setIsRankDialogOpen(true);
+          if (userSnap.data().frameTier === rank.name) break;
         }
       }
-      await updateDoc(userRef, { frameTier: tier });
     }
   }
 
@@ -585,6 +555,7 @@ function CampaignList({ campaign, participations, user }: CampaignListProps) {
         open={isRankDialogOpen}
         onOpenChange={setIsRankDialogOpen}
         frameTier={frameTier}
+        rankImage={rankImage}
         type={type}
       />
 
@@ -610,7 +581,8 @@ function CampaignList({ campaign, participations, user }: CampaignListProps) {
 interface RankBadgeDialogProps {
   open: boolean;
   onOpenChange: React.Dispatch<React.SetStateAction<boolean>>;
-  frameTier: FrameTier;
+  frameTier: string;
+  rankImage: string;
   type: "promote" | "demote";
 }
 
@@ -618,27 +590,9 @@ function RankBadgeDialog({
   open = true,
   onOpenChange,
   frameTier,
+  rankImage,
   type,
 }: RankBadgeDialogProps) {
-  function getFrame() {
-    switch (frameTier) {
-      case "diamond":
-        return "/badges/DIAMOND.png";
-
-      case "platinum":
-        return "/badges/PLATINUM.png";
-
-      case "gold":
-        return "/badges/GOLD.png";
-
-      case "silver":
-        return "/badges/SILVER.png";
-
-      default:
-        return "/badges/BRONZE.png";
-    }
-  }
-
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
@@ -651,7 +605,7 @@ function RankBadgeDialog({
             <AspectRatio ratio={1 / 1}>
               <img
                 className="size-full object-cover"
-                src={getFrame()}
+                src={rankImage}
                 alt="frame tier"
               />
             </AspectRatio>
