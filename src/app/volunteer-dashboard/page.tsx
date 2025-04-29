@@ -582,7 +582,7 @@ function CampaignList({ campaign, participations, user }: CampaignListProps) {
         await addScoreLog("share", campaignOptions.share, user, campaignId);
 
         // Open the Facebook share dialog
-        const url = `https://envirolink-seven.vercel.app/campaign/${campaignId}`;
+        const url = `https://envirolink.vercel.app/campaign/${campaignId}`;
         const shareUrl = `https://www.facebook.com/sharer/sharer.php?u=${url}?e=${encodeURIComponent(
           campaignData?.title ?? "",
         )}`;
@@ -618,46 +618,31 @@ function CampaignList({ campaign, participations, user }: CampaignListProps) {
         const frameTier = user.frameTier;
         const profilepictureURL = user.profilepictureURL;
 
-        let rankImage = "";
-
         const ranks = rankDocs.docs.map((doc) => ({
           ...doc.data(),
           id: doc.id,
         }));
 
+        let rankImage = "";
         for (const rank of ranks) {
           if (user.points >= rank.points) {
             rankImage += rank.image;
-            // Add a new participation record
-            await addDoc(collection(db, "participation"), {
-              campaignid: campaignId,
-              uid,
-              displayName,
-              joindate: serverTimestamp(),
-              status: "joined",
-              isPresent: false,
-              frameTier,
-              profilepictureURL,
-              rankImage,
-            });
-
             break;
           }
-          else {
-            // Add a new participation record
-            await addDoc(collection(db, "participation"), {
-              campaignid: campaignId,
-              uid,
-              displayName,
-              joindate: serverTimestamp(),
-              status: "joined",
-              isPresent: false,
-              frameTier,
-              profilepictureURL,
-              rankImage,
-            });
-          }
         }
+
+        // Add a new participation record
+        await addDoc(collection(db, "participation"), {
+          campaignid: campaignId,
+          uid,
+          displayName,
+          joindate: serverTimestamp(),
+          status: "joined",
+          isPresent: false,
+          frameTier,
+          profilepictureURL,
+          rankImage,
+        });
       } catch (error) {
         toast.error("Error joining campaign. Please try again.");
       }

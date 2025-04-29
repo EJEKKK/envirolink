@@ -52,11 +52,13 @@ export default function JoinedVolunteerList({
                   <div>
                     <div className="flex items-center gap-1">
                       <p className="text-sm">{participation.displayName}</p>
-                      <img
-                        className="size-4"
-                        src={participation.rankImage ?? ""}
-                        alt={participation.frameTier}
-                      />
+                      {participation.rankImage.length > 0 && (
+                        <img
+                          className="size-4"
+                          src={participation.rankImage ?? ""}
+                          alt={participation.frameTier}
+                        />
+                      )}
                     </div>
                     <p className="text-muted-foreground text-sm">
                       {format(
