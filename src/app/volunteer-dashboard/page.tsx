@@ -241,7 +241,6 @@ export default function VounteerDashboard() {
 
 		const participationQuery = query(
 			collection(db, "participation").withConverter(participationConverter),
-			where("uid", "==", user?.uid),
 			where("status", "==", "joined"),
 		);
 
