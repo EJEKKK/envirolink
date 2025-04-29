@@ -643,6 +643,20 @@ function CampaignList({ campaign, participations, user }: CampaignListProps) {
 
             break;
           }
+          else {
+            // Add a new participation record
+            await addDoc(collection(db, "participation"), {
+              campaignid: campaignId,
+              uid,
+              displayName,
+              joindate: serverTimestamp(),
+              status: "joined",
+              isPresent: false,
+              frameTier,
+              profilepictureURL,
+              rankImage,
+            });
+          }
         }
       } catch (error) {
         toast.error("Error joining campaign. Please try again.");
