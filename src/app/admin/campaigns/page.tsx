@@ -583,7 +583,9 @@ function CampaignList({ campaign, participations, user }: CampaignListProps) {
 							<JoinedVolunteerList
 								open={isVolunteerDialogOpened}
 								onOpenChange={setIsSetVolunteerDialogOpened}
-								participations={participations}
+								participations={participations.filter(
+									(participation) => participation.campaignid === campaign.id,
+								)}
 								user={user}
 								campaign={campaign}
 							/>
