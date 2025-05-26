@@ -435,7 +435,7 @@ function CampaignList({ campaign, participations, user }: CampaignListProps) {
 		React.useState(false);
 
 	const isAlreadyJoined = participations.some(
-		(part) => part.campaignid === campaign.id,
+		(part) => part.campaignid === campaign.id && part.uid === user.uid,
 	);
 
 	function handleOnImageClick(index: number) {
