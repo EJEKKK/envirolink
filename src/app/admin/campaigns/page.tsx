@@ -6,19 +6,15 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { format, intlFormatDistance, isAfter, isBefore } from "date-fns";
 import { onAuthStateChanged } from "firebase/auth";
 import {
-	type DocumentReference,
 	addDoc,
 	collection,
 	deleteDoc,
 	doc,
-	getDoc,
 	getDocs,
-	increment,
 	onSnapshot,
 	orderBy,
 	query,
 	serverTimestamp,
-	updateDoc,
 	where,
 } from "firebase/firestore";
 import {
@@ -97,21 +93,14 @@ import {
 	pointsConverter,
 	userConverter,
 } from "@/lib/utils";
-import type {
-	Campaign,
-	Comment,
-	FrameTier,
-	Participation,
-	Points,
-	User,
-} from "@/types";
+import type { Campaign, Comment, Participation, Points, User } from "@/types";
 import { type PointFormSchema, pointFormSchema } from "../_lib/validations";
 import AcceptCampaignDialog from "./_components/accept-campaign-dialog";
 import DeleteCampaignDialog from "./_components/delete-campaign-dialog";
 import EditCampaignDialog from "./_components/edit-campaign-dialog";
+import JoinedVolunteerList from "./_components/joined-volunteer-list";
 import RejectCampaignDialog from "./_components/reject-campaign-dialog";
 import VolunteerAttendanceDialog from "./_components/volunteer-attendance-dialog";
-import JoinedVolunteerList from "./_components/joined-volunteer-list";
 
 const CATEGORY_OPTIONS: Array<{
 	label: string;
@@ -827,7 +816,7 @@ function CampaignList({ campaign, participations, user }: CampaignListProps) {
 												<p className="text-xs font-bold">
 													{comment.displayName}
 												</p>
-												{comment.rankImage.length > 0 && (
+												{(comment.rankImage?.length as number) > 0 && (
 													<img
 														className="size-4"
 														src={comment.rankImage}
@@ -967,20 +956,10 @@ function CommentsDialog({
 	const [isSending, setIsSending] = React.useState(false);
 	const [isFetching, setIsFetching] = React.useState(false);
 	const [comment, setComment] = React.useState("");
-	const [frameTier, setFrameTier] = React.useState<FrameTier>("bronze");
-	const [isRankDialogOpen, setIsRankDialogOpen] = React.useState(false);
-	const [type, setType] = React.useState<"promote" | "demote">("promote");
 
 	const handleOnSendComment = async () => {
 		setIsSending(true);
 		const user = auth.currentUser;
-		const pointsRef = collection(
-			db,
-			"campaigns",
-			campaignId,
-			"points",
-		).withConverter(pointsConverter);
-		const campaignPoints = (await getDocs(pointsRef)).docs[0]!.data() as Points;
 
 		if (user) {
 			try {
@@ -997,15 +976,6 @@ function CommentsDialog({
 				// Add the comment to the 'comments' collection
 				await addDoc(collection(db, "comments"), commentData);
 
-				// Award 5 points
-				const userRef = doc(db, "users", user.uid);
-				await updateDoc(userRef, { points: increment(campaignPoints.comment) });
-				await updateFrameTier(userRef);
-				setType("promote");
-
-				toast.success(
-					`Comment added successfully and earned ${campaignPoints.comment} points!`,
-				);
 				setIsSending(false);
 				setComment("");
 			} catch (error) {
@@ -1029,56 +999,6 @@ function CommentsDialog({
 				toast.error("Error deleting comment. Please try again.");
 			});
 	};
-
-	// Helper function to update frame tier
-	async function updateFrameTier(userRef: DocumentReference) {
-		const userSnap = await getDoc(userRef);
-		if (userSnap.exists()) {
-			const points = userSnap.data().points || 0;
-			const currentTier = userSnap.data().frameTier as FrameTier;
-
-			let tier;
-			if (points >= 5001) {
-				tier = "diamond";
-
-				if (currentTier !== "diamond") {
-					type === "promote"
-						? setFrameTier("diamond")
-						: setFrameTier("platinum");
-					setIsRankDialogOpen(true);
-				}
-			} else if (points >= 3501) {
-				tier = "platinum";
-
-				if (currentTier !== "platinum") {
-					type === "promote" ? setFrameTier("platinum") : setFrameTier("gold");
-					setIsRankDialogOpen(true);
-				}
-			} else if (points >= 1501) {
-				tier = "gold";
-
-				if (currentTier !== "gold") {
-					type === "promote" ? setFrameTier("gold") : setFrameTier("silver");
-					setIsRankDialogOpen(true);
-				}
-			} else if (points >= 501) {
-				tier = "silver";
-
-				if (currentTier !== "silver") {
-					type === "promote" ? setFrameTier("silver") : setFrameTier("bronze");
-					setIsRankDialogOpen(true);
-				}
-			} else {
-				tier = "bronze";
-
-				if (currentTier !== "bronze" && type === "demote") {
-					setFrameTier("bronze");
-					setIsRankDialogOpen(true);
-				}
-			}
-			await updateDoc(userRef, { frameTier: tier });
-		}
-	}
 
 	// Effect to handle real-time updates to comments collection
 	React.useEffect(() => {
@@ -1138,7 +1058,7 @@ function CommentsDialog({
 															<p className="text-xs font-bold">
 																{comment.displayName}
 															</p>
-															{comment.rankImage.length > 0 && (
+															{(comment.rankImage?.length as number) > 0 && (
 																<img
 																	className="size-4"
 																	src={comment.rankImage}
@@ -1196,76 +1116,6 @@ function CommentsDialog({
 						<SendIcon />
 					</Button>
 				</div>
-
-				<RankBadgeDialog
-					frameTier={frameTier}
-					open={isRankDialogOpen}
-					onOpenChange={setIsRankDialogOpen}
-				/>
-			</DialogContent>
-		</Dialog>
-	);
-}
-
-interface RankBadgeDialogProps {
-	open: boolean;
-	onOpenChange: React.Dispatch<React.SetStateAction<boolean>>;
-	frameTier: FrameTier;
-}
-
-function RankBadgeDialog({
-	open = true,
-	onOpenChange,
-	frameTier,
-}: RankBadgeDialogProps) {
-	function getFrame() {
-		switch (frameTier) {
-			case "diamond":
-				return "/badges/DIAMOND.png";
-
-			case "platinum":
-				return "/badges/PLATINUM.png";
-
-			case "gold":
-				return "/badges/GOLD.png";
-
-			case "silver":
-				return "/badges/SILVER.png";
-
-			default:
-				return "/badges/BRONZE.png";
-		}
-	}
-
-	return (
-		<Dialog open={open} onOpenChange={onOpenChange}>
-			<DialogContent>
-				<DialogHeader>
-					<DialogTitle>Congratulations 🎉</DialogTitle>
-					<DialogDescription></DialogDescription>
-				</DialogHeader>
-				<div className="flex flex-col items-center justify-center text-center">
-					<div className="relative w-40">
-						<AspectRatio ratio={1 / 1}>
-							<img
-								className="size-full object-cover"
-								src={getFrame()}
-								alt="frame tier"
-							/>
-						</AspectRatio>
-					</div>
-					You have been promoted to the{" "}
-					<span className="font-bold">
-						{frameTier.charAt(0).toUpperCase() + frameTier.slice(1)}
-					</span>{" "}
-					tier! Keep up the great work and continue participating to earn more
-					points and rewards.
-				</div>
-				<DialogFooter>
-					<DialogClose asChild>
-						<Button className="w-full">Close</Button>
-					</DialogClose>
-				</DialogFooter>
 			</DialogContent>
 		</Dialog>
 	);
