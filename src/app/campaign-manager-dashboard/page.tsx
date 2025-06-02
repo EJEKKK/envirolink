@@ -1391,8 +1391,8 @@ function CampaignList({ campaign, participations, user }: CampaignListProps) {
 		const rankRef = firestore
 			.collection(db, "rankDescription")
 			.withConverter(rankDescriptionConverter);
-		const q = firestore.query(rankRef, firestore.orderBy("createdAt", "desc"));
-		const ranks = await (await firestore.getDocs(q)).docs.map((doc) => ({
+		const q = firestore.query(rankRef, firestore.orderBy("points", "desc"));
+		const ranks = (await firestore.getDocs(q)).docs.map((doc) => ({
 			...doc.data(),
 			id: doc.id,
 		}));
@@ -1401,6 +1401,24 @@ function CampaignList({ campaign, participations, user }: CampaignListProps) {
 			const points = userSnap.data().points || 0;
 
 			for (const rank of ranks) {
+				if (
+					(ranks[ranks.length - 1]?.points as number) > points &&
+					userSnap.data().frameTier.length >= 1
+				) {
+					const name = await firestore
+						.updateDoc(userRef, {
+							frameTier: "",
+						})
+						.then(() => {
+							setFrameTier("");
+							setRankImage("");
+							setIsRankDialogOpen(true);
+							return rank.name;
+						});
+
+					if (name.length < 1) break;
+				}
+
 				if (points >= rank.points) {
 					if (userSnap.data().frameTier !== rank.name) {
 						const name = await firestore
@@ -1703,11 +1721,13 @@ function CampaignList({ campaign, participations, user }: CampaignListProps) {
 													<p className="text-xs font-bold">
 														{comment.displayName}
 													</p>
-													<img
-														className="size-4"
-														src={comment.rankImage}
-														alt={comment.displayName}
-													/>
+													{comment.rankImage.length > 0 ? (
+														<img
+															className="size-4"
+															src={comment.rankImage}
+															alt={comment.displayName}
+														/>
+													) : null}
 												</div>
 											</div>
 											<p className="text-primary text-xs font-semibold">
@@ -1848,6 +1868,7 @@ function CommentsDialog({
 	const [rankImage, setRankImage] = React.useState("");
 	const [isRankDialogOpen, setIsRankDialogOpen] = React.useState(false);
 	const [type, setType] = React.useState<"promote" | "demote">("promote");
+
 	const handleOnSendComment = async () => {
 		setIsSending(true);
 		const pointsRef = firestore
@@ -1868,8 +1889,8 @@ function CommentsDialog({
 		const rankRef = firestore
 			.collection(db, "rankDescription")
 			.withConverter(rankDescriptionConverter);
-		const q = firestore.query(rankRef, firestore.orderBy("createdAt", "desc"));
-		const ranks = await (await firestore.getDocs(q)).docs.map((doc) => ({
+		const q = firestore.query(rankRef, firestore.orderBy("points", "desc"));
+		const ranks = (await firestore.getDocs(q)).docs.map((doc) => ({
 			...doc.data(),
 			id: doc.id,
 		}));
@@ -1935,8 +1956,8 @@ function CommentsDialog({
 		const rankRef = firestore
 			.collection(db, "rankDescription")
 			.withConverter(rankDescriptionConverter);
-		const q = firestore.query(rankRef, firestore.orderBy("createdAt", "desc"));
-		const ranks = await (await firestore.getDocs(q)).docs.map((doc) => ({
+		const q = firestore.query(rankRef, firestore.orderBy("points", "desc"));
+		const ranks = (await firestore.getDocs(q)).docs.map((doc) => ({
 			...doc.data(),
 			id: doc.id,
 		}));
@@ -1945,6 +1966,24 @@ function CommentsDialog({
 			const points = userSnap.data().points || 0;
 
 			for (const rank of ranks) {
+				if (
+					(ranks[ranks.length - 1]?.points as number) > points &&
+					userSnap.data().frameTier.length >= 1
+				) {
+					const name = await firestore
+						.updateDoc(userRef, {
+							frameTier: "",
+						})
+						.then(() => {
+							setFrameTier("");
+							setRankImage("");
+							setIsRankDialogOpen(true);
+							return rank.name;
+						});
+
+					if (name.length < 1) break;
+				}
+
 				if (points >= rank.points) {
 					if (userSnap.data().frameTier !== rank.name) {
 						const name = await firestore
@@ -2030,11 +2069,13 @@ function CommentsDialog({
 														<p className="text-xs font-bold">
 															{comment.displayName}
 														</p>
-														<img
-															className="size-4"
-															src={comment.rankImage}
-															alt={comment.displayName}
-														/>
+														{comment.rankImage.length >= 1 && (
+															<img
+																className="size-4"
+																src={comment.rankImage}
+																alt={comment.displayName}
+															/>
+														)}
 													</div>
 												</div>
 												<p className="text-primary text-xs font-semibold">
@@ -2109,26 +2150,32 @@ function RankBadgeDialog({
 		<Dialog open={open} onOpenChange={onOpenChange}>
 			<DialogContent>
 				<DialogHeader>
-					<DialogTitle>Congratulations 🎉</DialogTitle>
+					<DialogTitle>
+						{type === "promote" ? "Congratulations 🎉" : "Demoted 😔"}
+					</DialogTitle>
 					<DialogDescription></DialogDescription>
 				</DialogHeader>
 				<div className="flex flex-col items-center justify-center text-center">
-					<div className="relative w-40">
-						<AspectRatio ratio={1 / 1}>
-							<img
-								className="size-full object-cover"
-								src={rankImage}
-								alt="frame tier"
-							/>
-						</AspectRatio>
-					</div>
+					{rankImage.length >= 1 && (
+						<div className="relative w-40">
+							<AspectRatio ratio={1 / 1}>
+								<img
+									className="size-full object-cover"
+									src={rankImage}
+									alt="frame tier"
+								/>
+							</AspectRatio>
+						</div>
+					)}
 					{type === "promote"
 						? "You have been promoted to the"
 						: "You have been demoted to the"}
 					<span className="font-bold">
-						{frameTier.charAt(0).toUpperCase() + frameTier.slice(1)}
+						{frameTier.length >= 1
+							? frameTier.charAt(0).toUpperCase() + frameTier.slice(1)
+							: "Unranked"}
 					</span>{" "}
-					tier!{" "}
+					{frameTier.length >= 1 && " Tier "}
 					{type === "promote"
 						? "Keep up the great work and continue participating to earn more points and rewards."
 						: "You can try to earn back your previous rank by participating in more campaigns."}
