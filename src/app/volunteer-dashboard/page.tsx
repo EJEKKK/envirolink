@@ -654,7 +654,7 @@ function CampaignList({ campaign, participations, user }: CampaignListProps) {
 		try {
 			if (user) {
 				const participationId = participations.find(
-					(participation) => participation.campaignid === campaignId,
+					(participation) => participation.uid === user.uid,
 				)!.id;
 
 				const uid = user!.uid;
@@ -996,7 +996,7 @@ function CampaignList({ campaign, participations, user }: CampaignListProps) {
 												<p className="text-xs font-bold">
 													{comment.displayName}
 												</p>
-												{comment.rankImage.length > 0 && (
+												{comment.rankImage?.length > 0 && (
 													<img
 														className="size-4"
 														src={comment.rankImage}
@@ -1314,7 +1314,7 @@ function CommentsDialog({
 														<p className="text-xs font-bold">
 															{comment.displayName}
 														</p>
-														{comment.rankImage.length > 0 && (
+														{comment.rankImage?.length > 0 && (
 															<img
 																className="size-4"
 																src={comment.rankImage}

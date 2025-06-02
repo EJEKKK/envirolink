@@ -6,22 +6,8 @@ import * as React from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { format, intlFormatDistance, isAfter, isBefore } from "date-fns";
 import { onAuthStateChanged, signOut } from "firebase/auth";
-import {
-	type DocumentReference,
-	addDoc,
-	collection,
-	doc,
-	getDoc,
-	getDocs,
-	increment,
-	onSnapshot,
-	orderBy,
-	query,
-	serverTimestamp,
-	updateDoc,
-	where,
-} from "firebase/firestore";
-import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
+import * as firestore from "firebase/firestore";
+import { getBlob, getDownloadURL, ref, uploadBytes } from "firebase/storage";
 import {
 	CloudUploadIcon,
 	Loader,
@@ -32,8 +18,10 @@ import {
 	Trash2Icon,
 	XIcon,
 } from "lucide-react";
+import type { DateRange } from "react-day-picker";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
+import * as shallow from "zustand/shallow";
 
 import DatePicker from "@/components/date-picker";
 import DateRangePicker from "@/components/date-range-picker";
@@ -78,6 +66,7 @@ import {
 	DropzoneMessage,
 	DropzoneRemoveFile,
 	DropzoneTrigger,
+	type FileStatus,
 	useDropzone,
 } from "@/components/ui/dropzone";
 import {
@@ -104,6 +93,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { auth, db, storage } from "@/config/firebase";
 import { addScoreLog } from "@/helper";
 import useCreateCampaignStore from "@/hooks/use-create-campaign-store";
+import useEditCampaignStore from "@/hooks/use-edit-campaign-store";
 import {
 	campaignConverter,
 	cn,
@@ -115,13 +105,16 @@ import {
 	rankDescriptionConverter,
 	userConverter,
 } from "@/lib/utils";
-import { type CampaignSchema, campaignSchema } from "@/lib/validations";
+import {
+	type CreateCampaignSchema,
+	type EditCampaignSchema,
+	createCampaignSchema,
+	editCampaignSchema,
+} from "@/lib/validations";
 import type { Campaign, Comment, Participation, Points, User } from "@/types";
+import CampaignDropdownMenu from "./_components/campaign-dropdown-menu";
 import JoinedVolunteerList from "./_components/joined-volunteer-list";
 import VolunteerAttendanceDialog from "./_components/volunteer-attendance-dialog";
-
-import type { DateRange } from "react-day-picker";
-import { useShallow } from "zustand/shallow";
 
 const CATEGORY_OPTIONS: Array<{
 	label: string;
@@ -153,10 +146,10 @@ export default function CampaignManagerDashboard() {
 				return;
 			}
 
-			const userRef = doc(db, "users", user?.uid as string).withConverter(
-				userConverter,
-			);
-			onSnapshot(userRef, (doc) => {
+			const userRef = firestore
+				.doc(db, "users", user?.uid as string)
+				.withConverter(userConverter);
+			firestore.onSnapshot(userRef, (doc) => {
 				if (doc.data()?.blocked) {
 					toast.error("Your account has been blocked.");
 					void signOut(auth);
@@ -175,10 +168,10 @@ export default function CampaignManagerDashboard() {
 		if (!user) return;
 
 		const getLikes = async (docId: string) => {
-			const likeRef = collection(db, "campaigns", docId, "likes").withConverter(
-				likeConverter,
-			);
-			const likeSnapshot = await getDocs(likeRef);
+			const likeRef = firestore
+				.collection(db, "campaigns", docId, "likes")
+				.withConverter(likeConverter);
+			const likeSnapshot = await firestore.getDocs(likeRef);
 			const likes = likeSnapshot.docs.map((doc) => ({
 				...doc.data(),
 				id: doc.id,
@@ -188,102 +181,107 @@ export default function CampaignManagerDashboard() {
 		};
 
 		const getPoints = async (docId: string) => {
-			const pointsRef = collection(
-				db,
-				"campaigns",
-				docId,
-				"points",
-			).withConverter(pointsConverter);
+			const pointsRef = firestore
+				.collection(db, "campaigns", docId, "points")
+				.withConverter(pointsConverter);
 
-			const pointsSnapshot = await getDocs(pointsRef);
+			const pointsSnapshot = await firestore.getDocs(pointsRef);
 			const points = pointsSnapshot.docs[0]?.data() as Points;
 
 			return points;
 		};
 
-		const campaignQuery = query(
-			collection(db, "campaigns").withConverter(campaignConverter),
-			where("status", "==", "approved"),
-			orderBy("createdAt", "desc"),
+		const campaignQuery = firestore.query(
+			firestore.collection(db, "campaigns").withConverter(campaignConverter),
+			firestore.where("status", "==", "approved"),
+			firestore.orderBy("createdAt", "desc"),
 		);
-		const unsubCampaign = onSnapshot(campaignQuery, async (snapshot) => {
-			const newCampaigns: Campaign[] = [];
+		const unsubCampaign = firestore.onSnapshot(
+			campaignQuery,
+			async (snapshot) => {
+				const newCampaigns: Campaign[] = [];
 
-			for (const doc of snapshot.docs) {
-				const likes = await getLikes(doc.id);
-				const points = (await getPoints(doc.id)) as Points;
+				for (const doc of snapshot.docs) {
+					const likes = await getLikes(doc.id);
+					const points = (await getPoints(doc.id)) as Points;
 
-				for (const category of categories) {
-					if (
-						category === "on-going" &&
-						doc.data().description.when.toDate() <= new Date() &&
-						!doc.data().isDone
-					) {
-						newCampaigns.push({
-							...doc.data(),
-							id: doc.id,
-							likes,
-							points,
-						});
+					for (const category of categories) {
+						if (
+							category === "on-going" &&
+							doc.data().description.when.toDate() <= new Date() &&
+							!doc.data().isDone
+						) {
+							newCampaigns.push({
+								...doc.data(),
+								id: doc.id,
+								likes,
+								points,
+							});
+						}
+
+						if (category === "done" && doc.data().isDone) {
+							newCampaigns.push({
+								...doc.data(),
+								id: doc.id,
+								likes,
+								points,
+							});
+						}
+
+						if (
+							category === "new" &&
+							!doc.data().isDone &&
+							doc.data().description.when.toDate() > new Date()
+						) {
+							newCampaigns.push({
+								...doc.data(),
+								id: doc.id,
+								likes,
+								points,
+							});
+						}
 					}
 
-					if (category === "done" && doc.data().isDone) {
-						newCampaigns.push({
-							...doc.data(),
-							id: doc.id,
-							likes,
-							points,
-						});
-					}
-
-					if (
-						category === "new" &&
-						!doc.data().isDone &&
-						doc.data().description.when.toDate() > new Date()
-					) {
-						newCampaigns.push({
-							...doc.data(),
-							id: doc.id,
-							likes,
-							points,
-						});
+					if (categories.length === 0) {
+						newCampaigns.push({ ...doc.data(), likes, points, id: doc.id });
 					}
 				}
 
-				if (categories.length === 0) {
-					newCampaigns.push({ ...doc.data(), likes, points, id: doc.id });
+				if (date?.from && date?.to) {
+					const filteredByWhenCampaigns = newCampaigns.filter(
+						(campaign) =>
+							isBefore(date.from as Date, campaign.description.when.toDate()) &&
+							isAfter(date.to as Date, campaign.description.when.toDate()),
+					);
+
+					setCampaigns(filteredByWhenCampaigns);
+				} else {
+					setCampaigns(newCampaigns);
 				}
-			}
-
-			if (date?.from && date?.to) {
-				const filteredByWhenCampaigns = newCampaigns.filter(
-					(campaign) =>
-						isBefore(date.from as Date, campaign.description.when.toDate()) &&
-						isAfter(date.to as Date, campaign.description.when.toDate()),
-				);
-
-				setCampaigns(filteredByWhenCampaigns);
-			} else {
-				setCampaigns(newCampaigns);
-			}
-		});
-
-		const participationQuery = query(
-			collection(db, "participation").withConverter(participationConverter),
-			where("status", "==", "joined"),
+			},
 		);
 
-		const unsubParticipation = onSnapshot(participationQuery, (snapshot) => {
-			const newParticipations: Participation[] = [];
+		const participationQuery = firestore.query(
+			firestore
+				.collection(db, "participation")
+				.withConverter(participationConverter),
+			firestore.where("status", "==", "joined"),
+		);
 
-			for (const doc of snapshot.docs) {
-				const participation = doc.data();
+		const unsubParticipation = firestore.onSnapshot(
+			participationQuery,
+			(snapshot) => {
+				const newParticipations: Participation[] = [];
 
-				newParticipations.push({ ...participation, id: doc.id });
-			}
+				for (const doc of snapshot.docs) {
+					const participation = doc.data();
 
-			setParticipations(newParticipations);
-		});
+					newParticipations.push({ ...participation, id: doc.id });
+				}
+
+				setParticipations(newParticipations);
+			},
+		);
 
 		return () => {
 			unsubCampaign();
@@ -447,7 +445,7 @@ interface CreateCampaignFormProps {
 function CreateCampaignForm({ user }: CreateCampaignFormProps) {
 	const { isCreateCampaignOpen, setIsCreateCampaignOpen } =
 		useCreateCampaignStore(
-			useShallow((state) => ({
+			shallow.useShallow((state) => ({
 				isCreateCampaignOpen: state.open,
 				setIsCreateCampaignOpen: state.setOpen,
 			})),
@@ -455,8 +453,8 @@ function CreateCampaignForm({ user }: CreateCampaignFormProps) {
 
 	const [isPosting, setIsPosting] = React.useState(false);
 	const [time, setTime] = React.useState<string>("00:00");
-	const form = useForm<CampaignSchema>({
-		resolver: zodResolver(campaignSchema),
+	const form = useForm<CreateCampaignSchema>({
+		resolver: zodResolver(createCampaignSchema),
 		defaultValues: {
 			title: "",
 			description: {
@@ -492,7 +490,7 @@ function CreateCampaignForm({ user }: CreateCampaignFormProps) {
 		photoURLs,
 		title,
 		description,
-	}: CampaignSchema) => {
+	}: CreateCampaignSchema) => {
 		try {
 			setIsPosting(true);
 			const storageURLs = [];
@@ -515,28 +513,30 @@ function CreateCampaignForm({ user }: CreateCampaignFormProps) {
 			}
 
 			// Add a new campaign with "pending" status
-			await addDoc(collection(db, "campaigns"), {
-				title,
-				description: {
-					what: description.what,
-					where: description.where,
-					when: description.when,
-				},
-				photoURLs: storageURLs,
-				createdAt: serverTimestamp(),
-				managerUid: user!.uid,
-				managerDisplayName: user!.displayName,
-				managerPhotoURL: user!.profilepictureURL,
-				status: "pending", // New campaigns will have "pending" status
-				frameTier: user!.frameTier,
-				isDone: false,
-				isScoreApplied: false,
-			}).finally(() => {
-				toast.success("Campaign submitted for approval.");
-				form.reset(); // Clear the form
-				setIsPosting(false);
-				setIsCreateCampaignOpen(false); // Close the dialog
-			});
+			await firestore
+				.addDoc(firestore.collection(db, "campaigns"), {
+					title,
+					description: {
+						what: description.what,
+						where: description.where,
+						when: description.when,
+					},
+					photoURLs: storageURLs,
+					createdAt: firestore.serverTimestamp(),
+					managerUid: user!.uid,
+					managerDisplayName: user!.displayName,
+					managerPhotoURL: user!.profilepictureURL,
+					status: "pending", // New campaigns will have "pending" status
+					frameTier: user!.frameTier,
+					isDone: false,
+					isScoreApplied: false,
+				})
+				.finally(() => {
+					toast.success("Campaign submitted for approval.");
+					form.reset(); // Clear the form
+					setIsPosting(false);
+					setIsCreateCampaignOpen(false); // Close the dialog
+				});
 		} catch (error) {
 			toast.error("Error posting campaign. Please try again.");
 			setIsPosting(false);
@@ -767,6 +767,356 @@ function CreateCampaignForm({ user }: CreateCampaignFormProps) {
 	);
 }
 
+interface EditCampaignFormProps {
+	user: User | null;
+	campaign: Campaign;
+}
+
+function EditCampaignForm({ user, campaign }: EditCampaignFormProps) {
+	const { isEditCampaignOpen, setIsEditCampaignOpen } = useEditCampaignStore(
+		shallow.useShallow((state) => ({
+			isEditCampaignOpen: state.open,
+			setIsEditCampaignOpen: state.setOpen,
+		})),
+	);
+
+	const [isUpdating, setIsUpdating] = React.useState(false);
+	const [time, setTime] = React.useState<string>("00:00");
+	const [files, setFiles] = React.useState<File[]>([]);
+	const dropzoneAreaRef = React.useRef<HTMLLabelElement>(null);
+
+	const form = useForm<EditCampaignSchema>({
+		resolver: zodResolver(editCampaignSchema),
+		defaultValues: {
+			id: campaign.id ?? crypto.randomUUID(),
+			title: campaign.title ?? "Untitled",
+			description: campaign.description
+				? {
+						...campaign.description,
+						when: campaign.description.when.toDate(),
+					}
+				: {
+						where: "",
+						what: "",
+						when: new Date(),
+					},
+			photoURLs: campaign.photoURLs.length ? campaign.photoURLs : [],
+		},
+	});
+
+	const dropzone = useDropzone({
+		onDropFile: async (file: File) => {
+			const newFile = [...files, file];
+			setFiles(newFile);
+
+			await new Promise((resolve) => setTimeout(resolve, 1000));
+			return {
+				status: "success",
+				result: URL.createObjectURL(file),
+			};
+		},
+		shiftOnMaxFiles: true,
+		validation: {
+			accept: {
+				"image/*": [".png", ".jpg", ".jpeg"],
+			},
+			maxSize: 10 * 1024 * 1024,
+			maxFiles: 10,
+		},
+	});
+
+	const handleOnUpdateCampaign = async (values: EditCampaignSchema) => {
+		const campaignRef = firestore
+			.doc(db, "campaigns", values.id)
+			.withConverter(campaignConverter);
+		setIsUpdating(true);
+		const storageURLs = [];
+
+		if (files.length >= 1) {
+			for (let i = 0; i < files.length; i++) {
+				const file = files[i] as File;
+				const storageRef = ref(storage, `campaign_photos/${file.name}`);
+				await uploadBytes(storageRef, file);
+				const photoURL = await getDownloadURL(storageRef); // Get the URL after uploading
+				storageURLs.push(photoURL);
+			}
+		}
+
+		await firestore
+			.updateDoc(campaignRef, {
+				title: values.title,
+				description: values.description,
+				photoURLs: storageURLs.length
+					? values.photoURLs.concat(storageURLs)
+					: values.photoURLs,
+			})
+
+			.then(() => {
+				toast.success("Campaign updated successfully.");
+				setIsEditCampaignOpen(false);
+				setIsUpdating(false);
+			});
+	};
+
+	return (
+		<Dialog
+			open={isEditCampaignOpen}
+			onOpenChange={(open) => {
+				setIsEditCampaignOpen(open);
+				form.reset();
+			}}
+		>
+			<DialogContent>
+				<DialogHeader>
+					<DialogTitle>Edit Campaign</DialogTitle>
+					<DialogDescription>
+						Please provide the necessary information to set up your new campaign
+					</DialogDescription>
+				</DialogHeader>
+				<ScrollArea className="h-96">
+					<Form {...form}>
+						<form
+							className="flex flex-col gap-4"
+							onSubmit={form.handleSubmit(handleOnUpdateCampaign)}
+						>
+							<FormField
+								control={form.control}
+								name="title"
+								render={({ field }) => (
+									<FormItem className="flex flex-col">
+										<FormLabel>Campaign Title</FormLabel>
+										<FormControl>
+											<Input {...field} placeholder="Enter your title here" />
+										</FormControl>
+										<FormMessage />
+									</FormItem>
+								)}
+							/>
+
+							<FormField
+								control={form.control}
+								name="description.when"
+								render={({ field }) => (
+									<FormItem>
+										<FormLabel>When</FormLabel>
+										<FormControl>
+											<div className="flex w-full flex-col gap-4 sm:flex-row">
+												<DatePicker
+													triggerClassName="w-full md:w-fit"
+													date={field.value}
+													onValueChanged={(date) =>
+														form.setValue("description.when", date)
+													}
+												/>
+
+												<Select
+													defaultValue={time!}
+													onValueChange={(e) => {
+														setTime(e);
+														if (field.value) {
+															const [hours, minutes] = e.split(":");
+															const newDate = new Date(field.value.getTime());
+															newDate.setHours(
+																Number.parseInt(hours!),
+																Number.parseInt(minutes!),
+															);
+															field.onChange(newDate);
+														}
+													}}
+												>
+													<SelectTrigger className="w-full shrink-0 font-normal focus:ring-0 focus:ring-offset-0 sm:w-[120px]">
+														<SelectValue />
+													</SelectTrigger>
+													<SelectContent>
+														<ScrollArea className="h-[15rem]">
+															{Array.from({ length: 96 }).map((_, i) => {
+																const hour = Math.floor(i / 4)
+																	.toString()
+																	.padStart(2, "0");
+																const minute = ((i % 4) * 15)
+																	.toString()
+																	.padStart(2, "0");
+																return (
+																	<SelectItem
+																		key={i}
+																		value={`${hour}:${minute}`}
+																	>
+																		{hour}:{minute}
+																	</SelectItem>
+																);
+															})}
+														</ScrollArea>
+													</SelectContent>
+												</Select>
+											</div>
+										</FormControl>
+									</FormItem>
+								)}
+							/>
+
+							<FormField
+								control={form.control}
+								name="description.where"
+								render={({ field }) => (
+									<FormItem className="flex flex-col">
+										<FormLabel>Where</FormLabel>
+										<FormControl>
+											<Input {...field} placeholder="(e.g., location)" />
+										</FormControl>
+										<FormMessage />
+									</FormItem>
+								)}
+							/>
+
+							<FormField
+								control={form.control}
+								name="description.what"
+								render={({ field }) => (
+									<FormItem className="flex flex-col">
+										<FormLabel>What</FormLabel>
+										<FormControl>
+											<Input {...field} placeholder="(e.g., ML Tournament)" />
+										</FormControl>
+										<FormMessage />
+									</FormItem>
+								)}
+							/>
+
+							<FormField
+								control={form.control}
+								name="photoURLs"
+								render={() => (
+									<FormItem className="flex flex-col">
+										<div className="flex items-center gap-2">
+											{form.watch("photoURLs").length
+												? form.watch("photoURLs").map((url) => (
+														<div
+															className="bg-secondary relative overflow-hidden rounded-md p-0 shadow-sm"
+															key={url}
+														>
+															<img
+																src={url}
+																alt="Uploaded"
+																className="size-28 rounded-md object-cover"
+															/>
+															<Button
+																className="absolute top-2 right-2"
+																variant="outline"
+																size="icon"
+																onClick={() => {
+																	const filteredPhotos = form
+																		.watch("photoURLs")
+																		.filter((urlItem) => urlItem !== url);
+
+																	form.setValue("photoURLs", filteredPhotos);
+																}}
+															>
+																<Trash2Icon className="size-4" />
+															</Button>
+														</div>
+													))
+												: null}
+										</div>
+
+										<FormLabel>Images</FormLabel>
+										<FormControl>
+											<div className="not-prose flex flex-col gap-4">
+												<Dropzone {...dropzone}>
+													<div>
+														<div className="flex justify-between">
+															<DropzoneDescription>
+																Please select up to 10 images
+															</DropzoneDescription>
+															<DropzoneMessage />
+														</div>
+														<DropZoneArea>
+															<DropzoneTrigger
+																ref={dropzoneAreaRef}
+																className="flex flex-col items-center gap-4 bg-transparent p-10 text-center text-sm"
+															>
+																<CloudUploadIcon className="size-8" />
+																<div>
+																	<p className="font-semibold">Upload images</p>
+																	<p className="text-muted-foreground text-sm">
+																		Click here or drag and drop to upload
+																	</p>
+																</div>
+															</DropzoneTrigger>
+														</DropZoneArea>
+													</div>
+
+													<DropzoneFileList className="grid gap-3 p-0 md:grid-cols-2 lg:grid-cols-3">
+														{dropzone.fileStatuses.map((file) => (
+															<DropzoneFileListItem
+																className="bg-secondary overflow-hidden rounded-md p-0 shadow-sm"
+																key={file.id}
+																file={file}
+															>
+																{file.status === "pending" && (
+																	<div className="aspect-video animate-pulse bg-black/20" />
+																)}
+																{file.status === "success" && (
+																	// eslint-disable-next-line @next/next/no-img-element
+																	<img
+																		src={file.result}
+																		alt={`uploaded-${file.fileName}`}
+																		className="aspect-video object-cover"
+																	/>
+																)}
+																<div className="flex items-center justify-between p-2 pl-4">
+																	<div className="min-w-0">
+																		<p className="truncate text-sm">
+																			{file.fileName}
+																		</p>
+																		<p className="text-muted-foreground text-xs">
+																			{(file.file.size / (1024 * 1024)).toFixed(
+																				2,
+																			)}{" "}
+																			MB
+																		</p>
+																	</div>
+																	<DropzoneRemoveFile
+																		variant="ghost"
+																		className="shrink-0 hover:outline"
+																		onClick={() => {
+																			const filteredPhotos = files.filter(
+																				(photo) => photo.name !== file.fileName,
+																			);
+
+																			setFiles(filteredPhotos);
+																			dropzone.onRemoveFile(file.id);
+																		}}
+																	>
+																		<Trash2Icon className="size-4" />
+																	</DropzoneRemoveFile>
+																</div>
+															</DropzoneFileListItem>
+														))}
+													</DropzoneFileList>
+												</Dropzone>
+											</div>
+										</FormControl>
+										<FormMessage />
+									</FormItem>
+								)}
+							/>
+
+							<Button
+								type="submit"
+								className="sticky bottom-0 bg-green-700 hover:bg-green-700/90"
+								disabled={isUpdating}
+							>
+								{isUpdating ? <Loader className="animate-spin" /> : null} Update
+								Campaign
+							</Button>
+						</form>
+					</Form>
+				</ScrollArea>
+			</DialogContent>
+		</Dialog>
+	);
+}
+
 interface CampaignListProps {
 	campaign: Campaign;
 	participations: Participation[];
@@ -786,6 +1136,9 @@ function CampaignList({ campaign, participations, user }: CampaignListProps) {
 	const [shareCount, setShareCount] = React.useState(0);
 	const [isVolunteerDialogOpened, setIsSetVolunteerDialogOpened] =
 		React.useState(false);
+	const currentCampaignId = useEditCampaignStore(
+		(state) => state.currentCampaignId,
+	);
 
 	function handleOnImageClick(index: number) {
 		setIsLightBoxOpen(true);
@@ -795,14 +1148,11 @@ function CampaignList({ campaign, participations, user }: CampaignListProps) {
 	// Function to handle liking a campaign
 	const handleOnLikeCampaign = async (campaignId: string) => {
 		setIsLoading(true);
-		const optionsRef = collection(
-			db,
-			"campaigns",
-			campaignId,
-			"points",
-		).withConverter(pointsConverter);
+		const optionsRef = firestore
+			.collection(db, "campaigns", campaignId, "points")
+			.withConverter(pointsConverter);
 		const campaignOptions = (
-			await getDocs(optionsRef)
+			await firestore.getDocs(optionsRef)
 		).docs[0]!.data() as Points;
 
 		try {
@@ -817,16 +1167,21 @@ function CampaignList({ campaign, participations, user }: CampaignListProps) {
 			// Check if the campaign has no likes
 			if (campaign.likes?.length === 0 || !likeId) {
 				// If the campaign has no likes, add a new like document
-				const likeRef = collection(db, "campaigns", campaignId, "likes");
-				await addDoc(likeRef, { uid: user?.uid!, type: "like" });
+				const likeRef = firestore.collection(
+					db,
+					"campaigns",
+					campaignId,
+					"likes",
+				);
+				await firestore.addDoc(likeRef, { uid: user?.uid!, type: "like" });
 
 				// Update user points based on campaign like points
-				await updateDoc(doc(db, "users", user!.uid), {
-					points: increment(campaignOptions.like),
+				await firestore.updateDoc(firestore.doc(db, "users", user!.uid), {
+					points: firestore.increment(campaignOptions.like),
 				});
 
 				// Update user's frame tier based on their new points total
-				await updateFrameTier(doc(db, "users", user!.uid));
+				await updateFrameTier(firestore.doc(db, "users", user!.uid));
 				setType("promote");
 
 				toast.success(
@@ -841,34 +1196,43 @@ function CampaignList({ campaign, participations, user }: CampaignListProps) {
 				return;
 			}
 
-			const likeRef = doc(db, "campaigns", campaignId, "likes", likeId);
+			const likeRef = firestore.doc(
+				db,
+				"campaigns",
+				campaignId,
+				"likes",
+				likeId,
+			);
 
 			// If the user has already liked the campaign, change the like type to "dislike"
 			if (isCampaignLiked) {
-				await updateDoc(likeRef, { type: "dislike" });
+				await firestore.updateDoc(likeRef, { type: "dislike" });
 				window.location.reload();
 			} else {
 				// Otherwise, change the like type to "like"
-				await updateDoc(likeRef, { type: "like" });
+				await firestore.updateDoc(likeRef, { type: "like" });
 				window.location.reload();
 			}
 
-			const isLikeDataExist = await getDoc(likeRef);
+			const isLikeDataExist = await firestore.getDoc(likeRef);
 
 			// If the like document does not exist, create a new one
 			if (!isLikeDataExist) {
-				addDoc(collection(db, "campaigns", campaignId, "likes"), {
-					uid: user?.uid!,
-					type: "like",
-				});
+				firestore.addDoc(
+					firestore.collection(db, "campaigns", campaignId, "likes"),
+					{
+						uid: user?.uid!,
+						type: "like",
+					},
+				);
 
 				// Update user points based on campaign like points
-				await updateDoc(doc(db, "users", user!.uid), {
-					points: increment(campaignOptions.like),
+				await firestore.updateDoc(firestore.doc(db, "users", user!.uid), {
+					points: firestore.increment(campaignOptions.like),
 				});
 
 				// Update user's frame tier based on their new points total
-				await updateFrameTier(doc(db, "users", user!.uid));
+				await updateFrameTier(firestore.doc(db, "users", user!.uid));
 				setType("promote");
 
 				toast.success(
@@ -893,35 +1257,32 @@ function CampaignList({ campaign, participations, user }: CampaignListProps) {
 	// Function to handle sharing a campaign
 	const handleOnShareCampaign = async (campaignId: string) => {
 		setIsLoading(true);
-		const optionsRef = collection(
-			db,
-			"campaigns",
-			campaignId,
-			"points",
-		).withConverter(pointsConverter);
+		const optionsRef = firestore
+			.collection(db, "campaigns", campaignId, "points")
+			.withConverter(pointsConverter);
 		const campaignOptions = (
-			await getDocs(optionsRef)
+			await firestore.getDocs(optionsRef)
 		).docs[0]!.data() as Points;
 
 		if (user) {
 			try {
-				const campaignRef = doc(db, "campaigns", campaignId);
-				const campaignSnapshot = await getDoc(campaignRef);
+				const campaignRef = firestore.doc(db, "campaigns", campaignId);
+				const campaignSnapshot = await firestore.getDoc(campaignRef);
 				const campaignData = campaignSnapshot.data();
 
 				// Log share to participation
-				await addDoc(collection(db, "participation"), {
+				await firestore.addDoc(firestore.collection(db, "participation"), {
 					campaignid: campaignId,
 					uid: user.uid,
 					displayName: user.displayName || "Anonymous",
-					joinDate: serverTimestamp(),
+					joinDate: firestore.serverTimestamp(),
 					status: "shared",
 				});
 
 				// Award points based on campaign share points
-				const userRef = doc(db, "users", user.uid);
-				await updateDoc(userRef, {
-					points: increment(campaignOptions.share),
+				const userRef = firestore.doc(db, "users", user.uid);
+				await firestore.updateDoc(userRef, {
+					points: firestore.increment(campaignOptions.share),
 				});
 				await updateFrameTier(userRef);
 				setType("promote");
@@ -1025,13 +1386,13 @@ function CampaignList({ campaign, participations, user }: CampaignListProps) {
 	// };
 
 	// Helper function to update frame tier
-	async function updateFrameTier(userRef: DocumentReference) {
-		const userSnap = await getDoc(userRef);
-		const rankRef = collection(db, "rankDescription").withConverter(
-			rankDescriptionConverter,
-		);
-		const q = query(rankRef, orderBy("createdAt", "desc"));
-		const ranks = await (await getDocs(q)).docs.map((doc) => ({
+	async function updateFrameTier(userRef: firestore.DocumentReference) {
+		const userSnap = await firestore.getDoc(userRef);
+		const rankRef = firestore
+			.collection(db, "rankDescription")
+			.withConverter(rankDescriptionConverter);
+		const q = firestore.query(rankRef, firestore.orderBy("createdAt", "desc"));
+		const ranks = await (await firestore.getDocs(q)).docs.map((doc) => ({
 			...doc.data(),
 			id: doc.id,
 		}));
@@ -1042,14 +1403,16 @@ function CampaignList({ campaign, participations, user }: CampaignListProps) {
 			for (const rank of ranks) {
 				if (points >= rank.points) {
 					if (userSnap.data().frameTier !== rank.name) {
-						const name = await updateDoc(userRef, {
-							frameTier: rank.name,
-						}).then(() => {
-							setFrameTier(rank.name);
-							setRankImage(rank.image);
-							setIsRankDialogOpen(true);
-							return rank.name;
-						});
+						const name = await firestore
+							.updateDoc(userRef, {
+								frameTier: rank.name,
+							})
+							.then(() => {
+								setFrameTier(rank.name);
+								setRankImage(rank.image);
+								setIsRankDialogOpen(true);
+								return rank.name;
+							});
 
 						if (name === rank.name) break;
 					}
@@ -1067,16 +1430,16 @@ function CampaignList({ campaign, participations, user }: CampaignListProps) {
 
 	// Effect to listen for changes in campaign comments and update state
 	React.useEffect(() => {
-		const campaignRef = doc(db, "campaigns", campaign.id);
-		const commentsRef = collection(db, "comments").withConverter(
-			commentConverter,
-		);
-		const commentsQuery = query(
+		const campaignRef = firestore.doc(db, "campaigns", campaign.id);
+		const commentsRef = firestore
+			.collection(db, "comments")
+			.withConverter(commentConverter);
+		const commentsQuery = firestore.query(
 			commentsRef,
-			where("campaignRef", "==", campaignRef),
-			orderBy("timestamp", "desc"),
+			firestore.where("campaignRef", "==", campaignRef),
+			firestore.orderBy("timestamp", "desc"),
 		);
-		const unsub = onSnapshot(commentsQuery, async (snapshot) => {
+		const unsub = firestore.onSnapshot(commentsQuery, async (snapshot) => {
 			const comments = snapshot.docs.map((doc) => ({
 				...doc.data(),
 				id: doc.id,
@@ -1089,15 +1452,15 @@ function CampaignList({ campaign, participations, user }: CampaignListProps) {
 
 	// Effect to listen for changes in campaign shares and update state
 	React.useEffect(() => {
-		const participationRef = collection(db, "participation").withConverter(
-			participationConverter,
-		);
-		const shareCountQuery = query(
+		const participationRef = firestore
+			.collection(db, "participation")
+			.withConverter(participationConverter);
+		const shareCountQuery = firestore.query(
 			participationRef,
-			where("campaignid", "==", campaign.id),
-			where("status", "==", "shared"),
+			firestore.where("campaignid", "==", campaign.id),
+			firestore.where("status", "==", "shared"),
 		);
-		const unsub = onSnapshot(shareCountQuery, (snapshot) => {
+		const unsub = firestore.onSnapshot(shareCountQuery, (snapshot) => {
 			setShareCount(snapshot.size);
 		});
 
@@ -1138,15 +1501,9 @@ function CampaignList({ campaign, participations, user }: CampaignListProps) {
 											? "Ongoing"
 											: "New"}
 								</Badge>
-								{campaign.isDone || user?.uid !== campaign.managerUid ? null : (
-									<VolunteerAttendanceDialog
-										participations={participations.filter(
-											(participation) =>
-												participation.campaignid === campaign.id,
-										)}
-										campaign={campaign}
-									/>
-								)}
+								{campaign.managerUid === user?.uid && !campaign.isDone ? (
+									<CampaignDropdownMenu campaign={campaign} />
+								) : null}
 							</div>
 						</CardTitle>
 						<Separator className="my-2" />
@@ -1248,6 +1605,19 @@ function CampaignList({ campaign, participations, user }: CampaignListProps) {
 								) : null}
 							</div>
 						) : null}
+
+						{campaign.isDone || user?.uid !== campaign.managerUid ? null : (
+							<VolunteerAttendanceDialog
+								participations={participations.filter(
+									(participation) => participation.campaignid === campaign.id,
+								)}
+								campaign={campaign}
+							/>
+						)}
+
+						{currentCampaignId === campaign.id && (
+							<EditCampaignForm user={user} campaign={campaign} />
+						)}
 
 						<CampaignLightBoxDialog
 							open={isLightBoxOpen}
@@ -1480,25 +1850,26 @@ function CommentsDialog({
 	const [type, setType] = React.useState<"promote" | "demote">("promote");
 	const handleOnSendComment = async () => {
 		setIsSending(true);
-		const pointsRef = collection(
-			db,
-			"campaigns",
-			campaignId,
-			"points",
-		).withConverter(pointsConverter);
+		const pointsRef = firestore
+			.collection(db, "campaigns", campaignId, "points")
+			.withConverter(pointsConverter);
 		const campaignOptions = (
-			await getDocs(pointsRef)
+			await firestore.getDocs(pointsRef)
 		).docs[0]!.data() as Points;
 
-		const frameTier = await getDoc(
-			doc(db, "users", user?.uid ?? "").withConverter(userConverter),
-		).then((doc) => doc.data()!.frameTier);
+		const frameTier = await firestore
+			.getDoc(
+				firestore
+					.doc(db, "users", user?.uid ?? "")
+					.withConverter(userConverter),
+			)
+			.then((doc) => doc.data()!.frameTier);
 
-		const rankRef = collection(db, "rankDescription").withConverter(
-			rankDescriptionConverter,
-		);
-		const q = query(rankRef, orderBy("createdAt", "desc"));
-		const ranks = await (await getDocs(q)).docs.map((doc) => ({
+		const rankRef = firestore
+			.collection(db, "rankDescription")
+			.withConverter(rankDescriptionConverter);
+		const q = firestore.query(rankRef, firestore.orderBy("createdAt", "desc"));
+		const ranks = await (await firestore.getDocs(q)).docs.map((doc) => ({
 			...doc.data(),
 			id: doc.id,
 		}));
@@ -1513,12 +1884,12 @@ function CommentsDialog({
 
 		if (user) {
 			try {
-				const campaignRef = doc(db, "campaigns", campaignId);
+				const campaignRef = firestore.doc(db, "campaigns", campaignId);
 
 				const commentData = {
 					comment,
 					displayName: user.displayName || "Anonymous",
-					timestamp: serverTimestamp(),
+					timestamp: firestore.serverTimestamp(),
 					uid: user.uid,
 					campaignRef: campaignRef,
 					userPhotoURL: user.profilepictureURL,
@@ -1527,12 +1898,15 @@ function CommentsDialog({
 				};
 
 				// Add the comment to the 'comments' collection
-				await addDoc(collection(db, "comments"), commentData);
+				await firestore.addDoc(
+					firestore.collection(db, "comments"),
+					commentData,
+				);
 
 				// Award points based on campaign comment points
-				const userRef = doc(db, "users", user.uid);
-				await updateDoc(userRef, {
-					points: increment(campaignOptions.comment),
+				const userRef = firestore.doc(db, "users", user.uid);
+				await firestore.updateDoc(userRef, {
+					points: firestore.increment(campaignOptions.comment),
 				});
 				await updateFrameTier(userRef);
 				setType("promote");
@@ -1556,13 +1930,13 @@ function CommentsDialog({
 	};
 
 	// Helper function to update frame tier
-	async function updateFrameTier(userRef: DocumentReference) {
-		const userSnap = await getDoc(userRef);
-		const rankRef = collection(db, "rankDescription").withConverter(
-			rankDescriptionConverter,
-		);
-		const q = query(rankRef, orderBy("createdAt", "desc"));
-		const ranks = await (await getDocs(q)).docs.map((doc) => ({
+	async function updateFrameTier(userRef: firestore.DocumentReference) {
+		const userSnap = await firestore.getDoc(userRef);
+		const rankRef = firestore
+			.collection(db, "rankDescription")
+			.withConverter(rankDescriptionConverter);
+		const q = firestore.query(rankRef, firestore.orderBy("createdAt", "desc"));
+		const ranks = await (await firestore.getDocs(q)).docs.map((doc) => ({
 			...doc.data(),
 			id: doc.id,
 		}));
@@ -1573,14 +1947,16 @@ function CommentsDialog({
 			for (const rank of ranks) {
 				if (points >= rank.points) {
 					if (userSnap.data().frameTier !== rank.name) {
-						const name = await updateDoc(userRef, {
-							frameTier: rank.name,
-						}).then(() => {
-							setFrameTier(rank.name);
-							setRankImage(rank.image);
-							setIsRankDialogOpen(true);
-							return rank.name;
-						});
+						const name = await firestore
+							.updateDoc(userRef, {
+								frameTier: rank.name,
+							})
+							.then(() => {
+								setFrameTier(rank.name);
+								setRankImage(rank.image);
+								setIsRankDialogOpen(true);
+								return rank.name;
+							});
 
 						if (name === rank.name) break;
 					}
@@ -1594,17 +1970,21 @@ function CommentsDialog({
 	// Effect to handle real-time updates to comments collection
 	React.useEffect(() => {
 		setIsFetching(true);
-		const commentsCollection = collection(db, "comments").withConverter(
-			commentConverter,
-		);
+		const commentsCollection = firestore
+			.collection(db, "comments")
+			.withConverter(commentConverter);
 
-		const commentsQuery = query(
+		const commentsQuery = firestore.query(
 			commentsCollection,
-			orderBy("timestamp", "desc"),
-			where("campaignRef", "==", doc(db, "campaigns", campaignId)),
+			firestore.orderBy("timestamp", "desc"),
+			firestore.where(
+				"campaignRef",
+				"==",
+				firestore.doc(db, "campaigns", campaignId),
+			),
 		);
 
-		const unsub = onSnapshot(commentsQuery, (snapshot) => {
+		const unsub = firestore.onSnapshot(commentsQuery, (snapshot) => {
 			const comments: Comment[] = [];
 
 			snapshot.forEach((doc) => {
