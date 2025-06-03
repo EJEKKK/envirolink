@@ -7,7 +7,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { format, intlFormatDistance, isAfter, isBefore } from "date-fns";
 import { onAuthStateChanged, signOut } from "firebase/auth";
 import * as firestore from "firebase/firestore";
-import { getBlob, getDownloadURL, ref, uploadBytes } from "firebase/storage";
+import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
 import {
 	CloudUploadIcon,
 	Loader,
@@ -66,7 +66,6 @@ import {
 	DropzoneMessage,
 	DropzoneRemoveFile,
 	DropzoneTrigger,
-	type FileStatus,
 	useDropzone,
 } from "@/components/ui/dropzone";
 import {
@@ -1624,7 +1623,9 @@ function CampaignList({ campaign, participations, user }: CampaignListProps) {
 							</div>
 						) : null}
 
-						{campaign.isDone || user?.uid !== campaign.managerUid ? null : (
+						{campaign.id !== currentCampaignId ||
+						campaign.isDone ||
+						user?.uid !== campaign.managerUid ? null : (
 							<VolunteerAttendanceDialog
 								participations={participations.filter(
 									(participation) => participation.campaignid === campaign.id,

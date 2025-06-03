@@ -44,7 +44,12 @@ export default function CampaignDropdownMenu({
 				>
 					<Edit2Icon /> Edit campaign
 				</DropdownMenuItem>
-				<DropdownMenuItem onClick={() => setVolunteerAttendanceOpen(true)}>
+				<DropdownMenuItem
+					onClick={() => {
+						setEditCampaignId(campaign.id);
+						setVolunteerAttendanceOpen(true);
+					}}
+				>
 					<CheckCircleIcon /> Mark as Done
 				</DropdownMenuItem>
 			</DropdownMenuContent>

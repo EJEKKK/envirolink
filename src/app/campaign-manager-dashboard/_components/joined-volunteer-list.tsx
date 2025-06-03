@@ -1,5 +1,4 @@
 "use client";
-import Image from "next/image";
 import * as React from "react";
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -75,12 +74,10 @@ export default function JoinedVolunteerList({
 										<div className="flex items-center gap-1">
 											<p className="text-sm">{participation.displayName}</p>
 											{participation.rankImage.length >= 1 && (
-												<Image
+												<img
+													className="size-4"
 													src={participation.rankImage}
 													alt={participation.frameTier}
-													priority
-													height={18}
-													width={18}
 												/>
 											)}
 										</div>
