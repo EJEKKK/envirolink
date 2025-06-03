@@ -654,7 +654,9 @@ function CampaignList({ campaign, participations, user }: CampaignListProps) {
 		try {
 			if (user) {
 				const participationId = participations.find(
-					(participation) => participation.uid === user.uid,
+					(participation) =>
+						participation.uid === user.uid &&
+						participation.campaignid === campaignId,
 				)!.id;
 
 				const uid = user!.uid;
