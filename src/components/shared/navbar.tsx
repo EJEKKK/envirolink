@@ -114,7 +114,9 @@ export default function Navbar({ user }: NavbarProps) {
 										alt="frame tier"
 									/>
 								)}
-								<p className="text-xs">{formatCompactNumber(user.points)}pts</p>
+								<p className="text-xs">
+									{user.points < 0 ? 0 : formatCompactNumber(user.points)}pts
+								</p>
 								<ChevronDown className="size-4" />
 							</Button>
 						</DropdownMenuTrigger>

@@ -666,10 +666,16 @@ function CampaignList({ campaign, participations, user }: CampaignListProps) {
 					toast.error("Error leaving campaign. Please try again.");
 				});
 
+				const currentPoints = user.points - 10;
+				const isNegative = currentPoints < 0;
+
 				const userRef = doc(db, "users", uid).withConverter(userConverter);
-				await updateDoc(userRef, { points: increment(-10) }).finally(() => {
+				await updateDoc(userRef, {
+					points: isNegative ? 0 : increment(-10),
+				}).finally(() => {
 					toast.success("Successfully left the campaign and lost 10 points");
 				});
+
 				await updateFrameTier(userRef);
 				setType("demote");
 

@@ -311,10 +311,10 @@ export default function Campaigns() {
 					</div>
 				</div>
 
-				<Tabs className="w-full" defaultValue="approved">
+				<Tabs className="w-full" defaultValue="pending">
 					<TabsList>
-						<TabsTrigger value="approved">Approved</TabsTrigger>
 						<TabsTrigger value="pending">Pending</TabsTrigger>
+						<TabsTrigger value="approved">Approved</TabsTrigger>
 						<TabsTrigger value="complete">Complete</TabsTrigger>
 					</TabsList>
 					<TabsContent
@@ -325,10 +325,15 @@ export default function Campaigns() {
 							<div className="flex items-center justify-center md:col-span-2 lg:col-span-3">
 								<Loader2Icon className="text-primary animate-spin" />
 							</div>
-						) : campaigns.filter((campaign) => campaign.status === "approved")
-								.length >= 1 ? (
+						) : campaigns.filter(
+								(campaign) =>
+									campaign.status === "approved" && !campaign.isDone,
+							).length >= 1 ? (
 							campaigns
-								.filter((campaign) => campaign.status === "approved")
+								.filter(
+									(campaign) =>
+										campaign.status === "approved" && !campaign.isDone,
+								)
 								.map((campaign) => (
 									<CampaignList
 										key={campaign.id}
@@ -382,11 +387,12 @@ export default function Campaigns() {
 								<Loader2Icon className="text-primary animate-spin" />
 							</div>
 						) : campaigns.filter(
-								(campaign) => campaign.isScoreApplied && campaign.isDone,
+								(campaign) => campaign.status === "approved" && campaign.isDone,
 							).length >= 1 ? (
 							campaigns
 								.filter(
-									(campaign) => campaign.isScoreApplied && campaign.isDone,
+									(campaign) =>
+										campaign.status === "approved" && campaign.isDone,
 								)
 								.map((campaign) => (
 									<CampaignList
@@ -504,11 +510,13 @@ function CampaignList({ campaign, participations, user }: CampaignListProps) {
 								className={cn("cursor-pointer")}
 								variant={campaign.isDone ? "outline" : "default"}
 							>
-								{campaign.isDone
+								{campaign.isDone && !campaign.isScoreApplied
 									? "Done"
-									: campaign.description.when.toDate() <= new Date()
-										? "Ongoing"
-										: "New"}
+									: campaign.isDone && campaign.isScoreApplied
+										? "Completed"
+										: campaign.description.when.toDate() <= new Date()
+											? "Ongoing"
+											: "New"}
 							</Badge>
 							<DropdownMenu>
 								{campaign.status !== "pending" && (
