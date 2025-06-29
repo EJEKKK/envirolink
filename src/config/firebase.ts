@@ -5,19 +5,19 @@ import { getStorage } from "firebase/storage";
 
 // Firebase configuration object containing keys and identifiers for your app
 const firebaseConfig = {
-  // apiKey: "AIzaSyCUIrhYlWJhZEeMAt9UwwWALcQDaPL6_wQ",
-  // authDomain: "envirolink-df389.firebaseapp.com",
-  // projectId: "envirolink-df389",
-  // storageBucket: "envirolink-df389.appspot.com",
-  // messagingSenderId: "358406913066",
-  // appId: "1:358406913066:web:823b03929103721994d753",
-  // measurementId: "G-CLC9KHC3V1",
-  apiKey: "AIzaSyCFb5qLDoz2hpWDnJ2Vf-ie1-3Fvt3F_Ds",
-  authDomain: "e-commerce-project-fe192.firebaseapp.com",
-  projectId: "e-commerce-project-fe192",
-  storageBucket: "e-commerce-project-fe192.appspot.com",
-  messagingSenderId: "197203638225",
-  appId: "1:197203638225:web:b7c00f3c987c91167c12f0",
+  apiKey: "AIzaSyCUIrhYlWJhZEeMAt9UwwWALcQDaPL6_wQ",
+  authDomain: "envirolink-df389.firebaseapp.com",
+  projectId: "envirolink-df389",
+  storageBucket: "envirolink-df389.appspot.com",
+  messagingSenderId: "358406913066",
+  appId: "1:358406913066:web:823b03929103721994d753",
+  measurementId: "G-CLC9KHC3V1",
+  // apiKey: "AIzaSyCFb5qLDoz2hpWDnJ2Vf-ie1-3Fvt3F_Ds",
+  // authDomain: "e-commerce-project-fe192.firebaseapp.com",
+  // projectId: "e-commerce-project-fe192",
+  // storageBucket: "e-commerce-project-fe192.appspot.com",
+  // messagingSenderId: "197203638225",
+  // appId: "1:197203638225:web:b7c00f3c987c91167c12f0",
 };
 
 // Initialize Firebase app with the provided configuration

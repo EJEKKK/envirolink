@@ -30,7 +30,7 @@ export async function generateMetadata(
 		openGraph: {
 			title: campaign.title,
 			description: campaign.description?.what,
-			url: `https://envirolink.vercel.app/campaign/${campaignId}?v=${Date.now()}`,
+			url: `https://envirolink-seven.vercel.app/campaign/${campaignId}?v=${Date.now()}`,
 			images: [
 				{
 					url: campaign.photoURLs?.[0] ?? "",
