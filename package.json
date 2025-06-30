@@ -47,7 +47,7 @@
     "react-dom": "^19.1.0",
     "react-dropzone": "^14.3.8",
     "react-firebase-hooks": "^5.1.1",
-    "react-hook-form": "^7.58.1",
+    "react-hook-form": "^7.59.0",
     "react-image-crop": "^11.0.10",
     "recharts": "^2.15.4",
     "sonner": "^2.0.5",
@@ -59,11 +59,11 @@
   "devDependencies": {
     "@biomejs/biome": "1.9.4",
     "@tailwindcss/postcss": "^4.1.11",
-    "@types/node": "^20.19.1",
+    "@types/node": "^20.19.2",
     "@types/react": "^19.1.8",
     "@types/react-dom": "^19.1.6",
     "postcss": "^8.5.6",
-    "prettier": "^3.6.1",
+    "prettier": "^3.6.2",
     "prettier-plugin-tailwindcss": "^0.6.13",
     "tailwindcss": "^4.1.11",
     "typescript": "^5.8.3"

@@ -91,7 +91,7 @@ export default function VolunteerAttendanceDialog({
 
 		// Increment the campaign manager's points by the submitted score and update the document in Firestore
 		await updateDoc(campaignManagerRef, {
-			points: increment(points.campaignManager + values.score),
+			points: increment(points.campaignManager),
 		});
 
 		const campaignManagerData = (
