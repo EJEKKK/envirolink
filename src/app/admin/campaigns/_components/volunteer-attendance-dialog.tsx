@@ -100,7 +100,7 @@ export default function VolunteerAttendanceDialog({
 
 		await addScoreLog(
 			"join",
-			values.score,
+			points.campaignManager,
 			campaignManagerData as User,
 			participations.find(
 				(participation) => participation.uid === campaign.managerUid,
