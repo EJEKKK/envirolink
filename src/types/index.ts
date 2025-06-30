@@ -104,7 +104,13 @@ export type Participation = {
 	uid: string;
 };
 
-export type InteractionType = "like" | "comment" | "share" | "join" | "leave";
+export type InteractionType =
+	| "like"
+	| "comment"
+	| "share"
+	| "join"
+	| "leave"
+	| "complete";
 
 export type ScoreHistoryLog = {
 	id: string;

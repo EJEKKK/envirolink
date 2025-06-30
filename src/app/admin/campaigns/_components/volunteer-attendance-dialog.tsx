@@ -99,7 +99,7 @@ export default function VolunteerAttendanceDialog({
 		).data() as User;
 
 		await addScoreLog(
-			"join",
+			"complete",
 			points.campaignManager,
 			campaignManagerData as User,
 			participations.find(
